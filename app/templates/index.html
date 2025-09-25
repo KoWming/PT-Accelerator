@@ -319,7 +319,6 @@
                     <i class="bi bi-list-check me-1"></i>Hosts源管理
                 </button>
             </li>
-
             <li class="nav-item" role="presentation">
                 <button class="nav-link" id="clients-tab" data-bs-toggle="tab" data-bs-target="#clients" type="button" role="tab" aria-controls="clients" aria-selected="false">
                     <i class="bi bi-download me-1"></i>下载器管理
@@ -330,13 +329,11 @@
                     <i class="bi bi-journal-text me-1"></i>日志
                 </button>
             </li>
-
             <li class="nav-item" role="presentation">
                 <button class="nav-link" id="notify-tab" data-bs-toggle="tab" data-bs-target="#notify-settings" type="button" role="tab" aria-controls="notify-settings" aria-selected="false">
                     <i class="bi bi-bell me-1"></i>通知设置
                 </button>
             </li>
-
             <li class="nav-item" role="presentation">
                 <button class="nav-link" id="auth-settings-tab" data-bs-toggle="tab" data-bs-target="#auth-settings-content" type="button" role="tab" aria-controls="auth-settings-content" aria-selected="false">
                     <i class="bi bi-shield-lock"></i> 安全与认证
@@ -501,7 +498,6 @@
                         <i class="bi bi-plus-lg"></i>添加Hosts源
                     </button>
                 </div>
-                
                 <div class="card">
                     <div class="card-body p-0">
                         <div class="table-responsive">
@@ -534,8 +530,6 @@
                 </div>
             </div>
             
-
-
             <!-- 下载器管理 -->
             <div class="tab-pane fade" id="clients" role="tabpanel" aria-labelledby="clients-tab">
                 <!-- 动态下载器客户端管理容器 -->
@@ -640,10 +634,10 @@
                                 <label class="form-check-label" for="enableAuth">启用登录认证</label>
                             </div>
 
-                            <div id="authFields" class="d-none">
+                            <div id="authFields" class="{% if not config.auth.enable %}d-none{% endif %}">
                                 <div class="mb-3">
                                     <label for="authUsername" class="form-label">用户名</label>
-                                    <input type="text" class="form-control" id="authUsername" name="username" value="{{ config.auth.username if config.auth.enable else '' }}" placeholder="请输入用户名">
+                                    <input type="text" class="form-control" id="authUsername" name="username" value="{{ config.auth.username }}">
                                 </div>
                                 <hr>
                                 <h5 class="mb-3">修改密码</h5>
@@ -1221,8 +1215,6 @@
                             </div>
                         </div>
                         
-                        
-                        
                         <!-- 自定义Webhook配置 -->
                         <div id="webhook-config" class="channel-config" style="display: none;">
                             <div class="form-floating mb-3">
@@ -1304,13 +1296,13 @@ X-Custom: value"></textarea>
     <script src="/static/js/vendor/bootstrap.bundle.min.js"></script>
     <script src="/static/js/main.js"></script>
     <script src="/static/js/torrent_clients.js"></script>
+    <!-- 将后端配置作为纯 JSON 安全嵌入，避免转义与语法高亮器误判 -->
+    <script id="app-config" type="application/json">{{ config | tojson | safe }}</script>
     <script>
-        // 将Jinja2渲染的配置对象直接赋值给JavaScript变量
-        let initialConfig = JSON.parse('{{ config | tojson | safe }}');
-        let appConfig = JSON.parse('{{ config | tojson | safe }}'); // 全局appConfig，用于其他函数
-        let initialAuthConfig = JSON.parse('{{ config.auth | tojson | safe }}');
-
-
+        // 从 JSON 脚本节点读取配置，避免内联对象/字符串转义问题
+        var initialConfig = JSON.parse(document.getElementById('app-config').textContent);
+        var appConfig = initialConfig; // 全局appConfig，用于其他函数
+        var initialAuthConfig = (initialConfig && initialConfig.auth) ? initialConfig.auth : {};
 
         // 密码验证函数
         function validatePassword(password) {
@@ -1624,13 +1616,23 @@ X-Custom: value"></textarea>
                 const result = await response.json();
                 if (response.ok) {
                     const successMsg = result.message || '认证设置已更新。';
-                    
+
+                    // 判断是否为“从未启用 -> 启用”场景，需刷新/登录后再展示详细项
+                    const targetEnable = document.getElementById('enableAuth').checked;
+                    const becomingEnabled = Boolean(targetEnable && !(initialAuthConfig && initialAuthConfig.enable));
+
                     // 确定是否需要重新登录
-                    const needReload = result.message.includes("建议重新登录") || 
-                                     result.message.includes("下次访问生效") || 
-                                     result.message.includes("已自动登出");
-                    
+                    const needReload = becomingEnabled ||
+                        (result.message && (
+                            result.message.includes('建议重新登录') ||
+                            result.message.includes('下次访问生效') ||
+                            result.message.includes('已自动登出')
+                        ));
+
                     if (needReload) {
+                        // 先隐藏区域，等待刷新/登录后由 initialAuthConfig 控制显示
+                        const authFields = document.getElementById('authFields');
+                        authFields && authFields.classList.add('d-none');
                         showSuccessModal('设置更新成功', successMsg, '页面将在10秒后自动刷新以应用新设置。');
                         setTimeout(() => window.location.reload(), 10000);
                     } else {
@@ -1651,27 +1653,15 @@ X-Custom: value"></textarea>
                         // 更新全局的 initialAuthConfig，以便UI能正确反映
                         initialAuthConfig = updatedAuthConfig;
 
-                        // 根据新的认证状态切换显示
+                        // 根据新的认证状态切换显示（仅在未强制刷新时）
                         const authFields = document.getElementById('authFields');
-                        const enableAuthEl = document.getElementById('enableAuth');
-                        const authUsernameEl = document.getElementById('authUsername');
-                        const hasConfiguredAuth = !!(updatedAuthConfig && updatedAuthConfig.username && updatedAuthConfig.password_hash);
-
-                        enableAuthEl.checked = !!updatedAuthConfig.enable;
-                        authUsernameEl.value = hasConfiguredAuth ? (updatedAuthConfig.username || '') : '';
-
-                        if (updatedAuthConfig.enable && hasConfiguredAuth) {
+                        if (updatedAuthConfig.enable) {
                             authFields.classList.remove('d-none');
                         } else {
                             authFields.classList.add('d-none');
-                            // 清空密码相关输入
-                            const currentPassword = document.getElementById('currentPassword');
-                            const newPassword = document.getElementById('newPassword');
-                            const confirmPassword = document.getElementById('confirmPassword');
-                            if (currentPassword) currentPassword.value = '';
-                            if (newPassword) newPassword.value = '';
-                            if (confirmPassword) confirmPassword.value = '';
                         }
+                        document.getElementById('enableAuth').checked = updatedAuthConfig.enable;
+                        document.getElementById('authUsername').value = updatedAuthConfig.username;
                     }
                      // 清空密码字段并移除验证状态
                     const passwordFields = [
@@ -1726,7 +1716,6 @@ X-Custom: value"></textarea>
             }
         }
 
-
         document.addEventListener('DOMContentLoaded', function () {
             // 更新：从已经定义的 initialAuthConfig 初始化UI状态
             const enableAuthCheckbox = document.getElementById('enableAuth');
@@ -1734,30 +1723,27 @@ X-Custom: value"></textarea>
             const authUsernameInput = document.getElementById('authUsername');
 
             if (enableAuthCheckbox && authFields && authUsernameInput && initialAuthConfig) {
-                const hasConfiguredAuth = !!(initialAuthConfig && initialAuthConfig.username && initialAuthConfig.password_hash);
+                enableAuthCheckbox.checked = initialAuthConfig.enable;
+                authUsernameInput.value = initialAuthConfig.username;
 
-                enableAuthCheckbox.checked = !!initialAuthConfig.enable;
-                authUsernameInput.value = hasConfiguredAuth ? (initialAuthConfig.username || '') : '';
-
-                if (initialAuthConfig.enable && hasConfiguredAuth) {
+                if (initialAuthConfig.enable) {
                     authFields.classList.remove('d-none');
                 } else {
                     authFields.classList.add('d-none');
                 }
 
+                // 切换规则：
+                // - 若系统已启用(initialAuthConfig.enable=true)，切到关隐藏；再切回开立即显示（无需保存）
+                // - 若系统未启用(initialAuthConfig.enable=false)，首次切到开不显示，需保存并登录后再显示
                 enableAuthCheckbox.addEventListener('change', function () {
-                    // 无论开关状态，仅在已配置用户名与密码时才可显示，否则保持隐藏并清空输入
-                    if (this.checked && hasConfiguredAuth) {
+                    if (!this.checked) {
+                        authFields.classList.add('d-none');
+                        return;
+                    }
+                    if (initialAuthConfig && initialAuthConfig.enable) {
                         authFields.classList.remove('d-none');
                     } else {
                         authFields.classList.add('d-none');
-                        authUsernameInput.value = '';
-                        const currentPassword = document.getElementById('currentPassword');
-                        const newPassword = document.getElementById('newPassword');
-                        const confirmPassword = document.getElementById('confirmPassword');
-                        if (currentPassword) currentPassword.value = '';
-                        if (newPassword) newPassword.value = '';
-                        if (confirmPassword) confirmPassword.value = '';
                     }
                 });
             }
@@ -1768,7 +1754,7 @@ X-Custom: value"></textarea>
             
             // 其他DOMContentLoaded逻辑...
             loadTrackers();
-            
+
             // 初始化通知设置功能
             initNotifySettings();
         });

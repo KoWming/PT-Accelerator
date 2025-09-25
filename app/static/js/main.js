@@ -850,12 +850,20 @@ function showToast(message, type = 'info', delay = 8000) {
         }, { once: true });
     });
     toast.show();
-    // Toast隐藏后移除元素
+    // Toast隐藏后移除元素（防并发与重复移除保护）
     toastElement.addEventListener('hidden.bs.toast', function() {
-        if (toastContainer.children.length <= 1) {
-            document.body.removeChild(toastContainer);
-        } else {
-            toastContainer.removeChild(toastElement);
+        try {
+            // 先安全移除此 toast 自身
+            if (toastElement.parentNode) {
+                toastElement.parentNode.removeChild(toastElement);
+            }
+            // 若容器为空且仍在文档中，再移除容器
+            if (toastContainer && toastContainer.parentNode && toastContainer.children.length === 0) {
+                toastContainer.parentNode.removeChild(toastContainer);
+            }
+        } catch (e) {
+            // 忽略重复移除引发的 NotFoundError
+            console.warn('Toast cleanup warning:', e);
         }
     });
 }
@@ -1515,10 +1523,11 @@ function bindNotifyEvents() {
     // 保存渠道按钮
     const saveChannelBtn = document.getElementById('save-notify-channel');
     if (saveChannelBtn) {
-        saveChannelBtn.addEventListener('click', saveNotifyChannel);
+        saveChannelBtn.addEventListener('click', function (e) {
+            try { e.currentTarget && e.currentTarget.blur && e.currentTarget.blur(); } catch (_) {}
+            saveNotifyChannel();
+        });
     }
-    
-    // 全局测试按钮已移除，改为每个渠道卡片上的“测试”按钮
 }
 
 // 更新通知启用状态
@@ -1699,7 +1708,11 @@ async function saveNotifyChannel() {
         const data = await response.json();
         if (data.success) {
             showToast('通知渠道已保存', 'success');
-            bootstrap.Modal.getInstance(document.getElementById('notifyChannelModal')).hide();
+            const modalEl = document.getElementById('notifyChannelModal');
+            if (modalEl && document.activeElement && modalEl.contains(document.activeElement)) {
+                try { document.activeElement.blur(); } catch (_) {}
+            }
+            bootstrap.Modal.getInstance(modalEl).hide();
             form.reset();
             // 清理编辑状态
             delete form.dataset.editingKey;
