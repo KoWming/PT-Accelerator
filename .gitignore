@@ -108,4 +108,4 @@ logs/
 config/*.yaml
 *.csv
 .DS_Store
-.idea/ 
+.idea/
