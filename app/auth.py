@@ -70,6 +70,10 @@ def load_current_config():
             try:
                 with open(CONFIG_PATH, 'r', encoding='utf-8') as f:
                     config = yaml.safe_load(f) or {}
+                # 确保配置中有auth部分（UTF-8成功路径也需保证）
+                if "auth" not in config:
+                    config["auth"] = {}
+                return config
             except UnicodeDecodeError:
                 try:
                     with open(CONFIG_PATH, 'r', encoding='gbk') as f:

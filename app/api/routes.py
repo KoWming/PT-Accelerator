@@ -873,7 +873,7 @@ async def save_torrent_clients(
         config["torrent_clients"] = clients_config
         
         # 保存配置到文件
-        with open(CONFIG_PATH, 'w') as f:
+        with open(CONFIG_PATH, 'w', encoding='utf-8') as f:
             yaml.dump(config, f, default_flow_style=False, allow_unicode=True)
         
         # 更新 TorrentClientManager
@@ -967,7 +967,7 @@ async def delete_torrent_client(
         config["torrent_clients"] = updated_clients
         
         # 保存配置到文件
-        with open(CONFIG_PATH, 'w') as f:
+        with open(CONFIG_PATH, 'w', encoding='utf-8') as f:
             yaml.dump(config, f, default_flow_style=False, allow_unicode=True)
         
         # 更新 TorrentClientManager

@@ -640,10 +640,10 @@
                                 <label class="form-check-label" for="enableAuth">启用登录认证</label>
                             </div>
 
-                            <div id="authFields" class="{% if not config.auth.enable %}d-none{% endif %}">
+                            <div id="authFields" class="d-none">
                                 <div class="mb-3">
                                     <label for="authUsername" class="form-label">用户名</label>
-                                    <input type="text" class="form-control" id="authUsername" name="username" value="{{ config.auth.username }}">
+                                    <input type="text" class="form-control" id="authUsername" name="username" value="{{ config.auth.username if config.auth.enable else '' }}" placeholder="请输入用户名">
                                 </div>
                                 <hr>
                                 <h5 class="mb-3">修改密码</h5>
@@ -1653,13 +1653,25 @@ X-Custom: value"></textarea>
 
                         // 根据新的认证状态切换显示
                         const authFields = document.getElementById('authFields');
-                        if (updatedAuthConfig.enable) {
+                        const enableAuthEl = document.getElementById('enableAuth');
+                        const authUsernameEl = document.getElementById('authUsername');
+                        const hasConfiguredAuth = !!(updatedAuthConfig && updatedAuthConfig.username && updatedAuthConfig.password_hash);
+
+                        enableAuthEl.checked = !!updatedAuthConfig.enable;
+                        authUsernameEl.value = hasConfiguredAuth ? (updatedAuthConfig.username || '') : '';
+
+                        if (updatedAuthConfig.enable && hasConfiguredAuth) {
                             authFields.classList.remove('d-none');
                         } else {
                             authFields.classList.add('d-none');
+                            // 清空密码相关输入
+                            const currentPassword = document.getElementById('currentPassword');
+                            const newPassword = document.getElementById('newPassword');
+                            const confirmPassword = document.getElementById('confirmPassword');
+                            if (currentPassword) currentPassword.value = '';
+                            if (newPassword) newPassword.value = '';
+                            if (confirmPassword) confirmPassword.value = '';
                         }
-                        document.getElementById('enableAuth').checked = updatedAuthConfig.enable;
-                        document.getElementById('authUsername').value = updatedAuthConfig.username;
                     }
                      // 清空密码字段并移除验证状态
                     const passwordFields = [
@@ -1722,20 +1734,30 @@ X-Custom: value"></textarea>
             const authUsernameInput = document.getElementById('authUsername');
 
             if (enableAuthCheckbox && authFields && authUsernameInput && initialAuthConfig) {
-                enableAuthCheckbox.checked = initialAuthConfig.enable;
-                authUsernameInput.value = initialAuthConfig.username;
+                const hasConfiguredAuth = !!(initialAuthConfig && initialAuthConfig.username && initialAuthConfig.password_hash);
 
-                if (initialAuthConfig.enable) {
+                enableAuthCheckbox.checked = !!initialAuthConfig.enable;
+                authUsernameInput.value = hasConfiguredAuth ? (initialAuthConfig.username || '') : '';
+
+                if (initialAuthConfig.enable && hasConfiguredAuth) {
                     authFields.classList.remove('d-none');
                 } else {
                     authFields.classList.add('d-none');
                 }
 
                 enableAuthCheckbox.addEventListener('change', function () {
-                    if (this.checked) {
+                    // 无论开关状态，仅在已配置用户名与密码时才可显示，否则保持隐藏并清空输入
+                    if (this.checked && hasConfiguredAuth) {
                         authFields.classList.remove('d-none');
                     } else {
                         authFields.classList.add('d-none');
+                        authUsernameInput.value = '';
+                        const currentPassword = document.getElementById('currentPassword');
+                        const newPassword = document.getElementById('newPassword');
+                        const confirmPassword = document.getElementById('confirmPassword');
+                        if (currentPassword) currentPassword.value = '';
+                        if (newPassword) newPassword.value = '';
+                        if (confirmPassword) confirmPassword.value = '';
                     }
                 });
             }

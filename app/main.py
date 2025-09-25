@@ -389,7 +389,7 @@ async def startup_event():
     # 如果配置有更新，保存到文件并更新全局配置
     if config_updated:
         try:
-            with open(CONFIG_PATH, 'w') as f:
+            with open(CONFIG_PATH, 'w', encoding='utf-8') as f:
                 yaml.dump(current_config, f, default_flow_style=False, allow_unicode=True)
             # 更新全局配置
             config.update(current_config)
