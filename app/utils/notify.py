@@ -1057,42 +1057,49 @@ def one() -> str:
 
 def add_notify_function():
     notify_function = []
-    if push_config.get("BARK_PUSH"):
+    
+    # 检查通知渠道是否启用（通过ENABLE_前缀的配置项）
+    def is_channel_enabled(channel_name):
+        enable_key = f"ENABLE_{channel_name.upper()}"
+        return push_config.get(enable_key, True)  # 默认为启用状态
+    
+    if push_config.get("BARK_PUSH") and is_channel_enabled("bark"):
         notify_function.append(bark)
-    if push_config.get("CONSOLE"):
+    if push_config.get("CONSOLE") and is_channel_enabled("console"):
         notify_function.append(console)
-    if push_config.get("DD_BOT_TOKEN") and push_config.get("DD_BOT_SECRET"):
+    if push_config.get("DD_BOT_TOKEN") and push_config.get("DD_BOT_SECRET") and is_channel_enabled("dingding"):
         notify_function.append(dingding_bot)
-    if push_config.get("FSKEY"):
+    if push_config.get("FSKEY") and is_channel_enabled("feishu"):
         notify_function.append(feishu_bot)
-    if push_config.get("GOBOT_URL") and push_config.get("GOBOT_QQ"):
+    if push_config.get("GOBOT_URL") and push_config.get("GOBOT_QQ") and is_channel_enabled("go_cqhttp"):
         notify_function.append(go_cqhttp)
-    if push_config.get("GOTIFY_URL") and push_config.get("GOTIFY_TOKEN"):
+    if push_config.get("GOTIFY_URL") and push_config.get("GOTIFY_TOKEN") and is_channel_enabled("gotify"):
         notify_function.append(gotify)
-    if push_config.get("IGOT_PUSH_KEY"):
+    if push_config.get("IGOT_PUSH_KEY") and is_channel_enabled("igot"):
         notify_function.append(iGot)
-    if push_config.get("PUSH_KEY"):
+    if push_config.get("PUSH_KEY") and is_channel_enabled("serverj"):
         notify_function.append(serverJ)
-    if push_config.get("DEER_KEY"):
+    if push_config.get("DEER_KEY") and is_channel_enabled("pushdeer"):
         notify_function.append(pushdeer)
-    if push_config.get("CHAT_URL") and push_config.get("CHAT_TOKEN"):
+    if push_config.get("CHAT_URL") and push_config.get("CHAT_TOKEN") and is_channel_enabled("chat"):
         notify_function.append(chat)
-    if push_config.get("PUSH_PLUS_TOKEN"):
+    if push_config.get("PUSH_PLUS_TOKEN") and is_channel_enabled("pushplus"):
         notify_function.append(pushplus_bot)
-    if push_config.get("WE_PLUS_BOT_TOKEN"):
+    if push_config.get("WE_PLUS_BOT_TOKEN") and is_channel_enabled("weplus"):
         notify_function.append(weplus_bot)
-    if push_config.get("QMSG_KEY") and push_config.get("QMSG_TYPE"):
+    if push_config.get("QMSG_KEY") and push_config.get("QMSG_TYPE") and is_channel_enabled("qmsg"):
         notify_function.append(qmsg_bot)
-    if push_config.get("QYWX_AM"):
+    if push_config.get("QYWX_AM") and is_channel_enabled("wecom_app"):
         notify_function.append(wecom_app)
-    if push_config.get("QYWX_KEY"):
+    if push_config.get("QYWX_KEY") and is_channel_enabled("wecom_bot"):
         notify_function.append(wecom_bot)
-    if push_config.get("TG_BOT_TOKEN") and push_config.get("TG_USER_ID"):
+    if push_config.get("TG_BOT_TOKEN") and push_config.get("TG_USER_ID") and is_channel_enabled("telegram"):
         notify_function.append(telegram_bot)
     if (
         push_config.get("AIBOTK_KEY")
         and push_config.get("AIBOTK_TYPE")
         and push_config.get("AIBOTK_NAME")
+        and is_channel_enabled("aibotk")
     ):
         notify_function.append(aibotk)
     if (
@@ -1101,23 +1108,25 @@ def add_notify_function():
         and push_config.get("SMTP_EMAIL")
         and push_config.get("SMTP_PASSWORD")
         and push_config.get("SMTP_NAME")
+        and is_channel_enabled("smtp")
     ):
         notify_function.append(smtp)
-    if push_config.get("PUSHME_KEY"):
+    if push_config.get("PUSHME_KEY") and is_channel_enabled("pushme"):
         notify_function.append(pushme)
     if (
         push_config.get("CHRONOCAT_URL")
         and push_config.get("CHRONOCAT_QQ")
         and push_config.get("CHRONOCAT_TOKEN")
+        and is_channel_enabled("chronocat")
     ):
         notify_function.append(chronocat)
-    if push_config.get("WEBHOOK_URL") and push_config.get("WEBHOOK_METHOD"):
+    if push_config.get("WEBHOOK_URL") and push_config.get("WEBHOOK_METHOD") and is_channel_enabled("webhook"):
         notify_function.append(custom_notify)
-    if push_config.get("NTFY_TOPIC"):
+    if push_config.get("NTFY_TOPIC") and is_channel_enabled("ntfy"):
         notify_function.append(ntfy)
     if push_config.get("WXPUSHER_APP_TOKEN") and (
         push_config.get("WXPUSHER_TOPIC_IDS") or push_config.get("WXPUSHER_UIDS")
-    ):
+    ) and is_channel_enabled("wxpusher"):
         notify_function.append(wxpusher_bot)
     if not notify_function:
         print(f"无推送渠道，请检查通知变量是否正确")

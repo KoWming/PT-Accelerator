@@ -82,7 +82,12 @@ def _send_task_notify(title: str, content: str):
         if isinstance(channels, dict):
             for _, ch_conf in channels.items():
                 if isinstance(ch_conf, dict) and ch_conf.get("enable"):
-                    payloads.append(flatten_channel(ch_conf))
+                    flat_config = flatten_channel(ch_conf)
+                    # 添加渠道启用状态到配置中
+                    channel_type = ch_conf.get("type", "").lower()
+                    if channel_type:
+                        flat_config[f"ENABLE_{channel_type.upper()}"] = True
+                    payloads.append(flat_config)
 
         minimal_keys_sets = [
             ("WEBHOOK_URL", "WEBHOOK_METHOD"),
@@ -1093,7 +1098,12 @@ async def test_notify(payload: Dict[str, Any]):
             if contains_nested:
                 for _, ch_conf in channels_override.items():
                     if isinstance(ch_conf, dict) and ch_conf.get("enable", True):
-                        per_channel_payloads.append(flatten_channel(ch_conf))
+                        flat_config = flatten_channel(ch_conf)
+                        # 添加渠道启用状态到配置中
+                        channel_type = ch_conf.get("type", "").lower()
+                        if channel_type:
+                            flat_config[f"ENABLE_{channel_type.upper()}"] = True
+                        per_channel_payloads.append(flat_config)
             else:
                 # 顶层键集合 -> 直接作为一次独立发送
                 tmp_flat = dict(channels_override)
@@ -1106,7 +1116,12 @@ async def test_notify(payload: Dict[str, Any]):
         if use_saved_channels and isinstance(channels, dict):
             for _, ch_conf in channels.items():
                 if isinstance(ch_conf, dict) and ch_conf.get("enable"):
-                    per_channel_payloads.append(flatten_channel(ch_conf))
+                    flat_config = flatten_channel(ch_conf)
+                    # 添加渠道启用状态到配置中
+                    channel_type = ch_conf.get("type", "").lower()
+                    if channel_type:
+                        flat_config[f"ENABLE_{channel_type.upper()}"] = True
+                    per_channel_payloads.append(flat_config)
 
         # 过滤无效渠道（最小必需字段校验）
         valid_payloads: list[Dict[str, Any]] = []
