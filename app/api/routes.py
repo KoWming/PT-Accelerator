@@ -97,6 +97,7 @@ def _send_task_notify(title: str, content: str):
             ("BARK_PUSH",),
             ("WXPUSHER_APP_TOKEN",),
             ("GOTIFY_URL", "GOTIFY_TOKEN"),
+            ("MEDIASABER_HOST", "MEDIASABER_APIKEY"),
         ]
         valid = []
         for flat in payloads:
@@ -1137,6 +1138,7 @@ async def test_notify(payload: Dict[str, Any]):
             ("FSKEY",),                                  # 飞书
             ("DD_BOT_TOKEN", "DD_BOT_SECRET"),          # 钉钉
             ("CHAT_URL", "CHAT_TOKEN"),                 # Synology Chat
+            ("MEDIASABER_HOST", "MEDIASABER_APIKEY"),   # Media Saber
         ]
         for flat in per_channel_payloads:
             for keys in minimal_keys_sets:

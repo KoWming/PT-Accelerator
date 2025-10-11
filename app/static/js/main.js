@@ -1673,6 +1673,10 @@ async function saveNotifyChannel() {
             channelData.WEBHOOK_HEADERS = document.getElementById('webhook-headers').value;
             channelData.WEBHOOK_BODY = document.getElementById('webhook-body').value;
             break;
+        case 'mediasaber':
+            channelData.MEDIASABER_HOST = document.getElementById('mediasaber-host').value;
+            channelData.MEDIASABER_APIKEY = document.getElementById('mediasaber-apikey').value;
+            break;
     }
     // 每渠道一言开关（默认 false）
     const perHitokoto = document.getElementById('channel-hitokoto');
@@ -1892,6 +1896,14 @@ async function editChannel(channelKey) {
                 if (b4) b4.value = ch.BARK_LEVEL || '';
                 if (b5) b5.value = ch.BARK_URL || '';
                 if (b6) b6.checked = !!(ch.BARK_ARCHIVE && String(ch.BARK_ARCHIVE) !== '0' && String(ch.BARK_ARCHIVE).toLowerCase() !== 'false');
+                break;
+            }
+            
+            case 'mediasaber': {
+                const h = document.getElementById('mediasaber-host');
+                const a = document.getElementById('mediasaber-apikey');
+                if (h) h.value = ch.MEDIASABER_HOST || '';
+                if (a) a.value = ch.MEDIASABER_APIKEY || '';
                 break;
             }
             

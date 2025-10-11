@@ -606,6 +606,10 @@
                                     <h6 class="mb-1"><i class="bi bi-bell me-1"></i>iGot / Server酱 / 飞书 / 钉钉</h6>
                                     <p class="small text-muted">常用聚合与办公通知渠道，分别填写对应的 Key 或 Token 即可。</p>
                                 </div>
+                                <div class="mb-3">
+                                    <h6 class="mb-1"><i class="bi bi-broadcast me-1"></i>Media Saber</h6>
+                                    <p class="small text-muted">Media Saber专属通知渠道，只需配置服务器地址和apikey。</p>
+                                </div>
                                 <div class="mb-0">
                                     <h6 class="mb-1"><i class="bi bi-gear me-1"></i>自定义 Webhook</h6>
                                     <p class="small text-muted">支持 POST/GET，自定义 Header 与 Body（含占位符 $title/$content）。</p>
@@ -956,6 +960,7 @@
                                         <option value="bark">Bark</option>
                                         <option value="serverj">Server酱</option>
                                         <option value="chat">Synology Chat</option>
+                                        <option value="mediasaber">Media Saber</option>
                                         <option value="webhook">自定义Webhook</option>
                                     </select>
                                     <label for="channel-type">通知类型</label>
@@ -1212,6 +1217,27 @@
                             </div>
                             <div class="form-text mb-2">
                                 说明：在群组的整合服务中创建“传入Webhook”，复制Webhook URL；Token按需填写。
+                            </div>
+                        </div>
+                        
+                        <!-- Media Saber配置 -->
+                        <div id="mediasaber-config" class="channel-config" style="display: none;">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="form-floating mb-3">
+                                        <input type="url" class="form-control" id="mediasaber-host" placeholder="Media Saber服务器地址">
+                                        <label for="mediasaber-host">服务器地址</label>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-floating mb-3">
+                                        <input type="text" class="form-control" id="mediasaber-apikey" placeholder="API密钥">
+                                        <label for="mediasaber-apikey">API密钥</label>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="form-text mb-2">
+                                说明：填写Media Saber服务器的完整地址（如：https://your-domain.com）和对应的apikey。
                             </div>
                         </div>
                         

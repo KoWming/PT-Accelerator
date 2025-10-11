@@ -163,6 +163,9 @@ push_config = {
     'WXPUSHER_APP_TOKEN': '',           # wxpusher 的 appToken 官方文档: https://wxpusher.zjiecode.com/docs/ 管理后台: https://wxpusher.zjiecode.com/admin/
     'WXPUSHER_TOPIC_IDS': '',           # wxpusher 的 主题ID，多个用英文分号;分隔 topic_ids 与 uids 至少配置一个才行
     'WXPUSHER_UIDS': '',                # wxpusher 的 用户ID，多个用英文分号;分隔 topic_ids 与 uids 至少配置一个才行
+
+    'MEDIASABER_HOST': '',              # Media Saber 服务器地址，例：https://your-domain.com
+    'MEDIASABER_APIKEY': '',            # Media Saber API密钥
 }
 # fmt: on
 
@@ -927,6 +930,47 @@ def wxpusher_bot(title: str, content: str) -> None:
         print(f"wxpusher 推送失败！错误信息：{response.get('msg')}")
 
 
+@channel("mediasaber")
+def mediasaber_bot(title: str, content: str) -> None:
+    """
+    使用 Media Saber 推送消息。
+    """
+    if not push_config.get("MEDIASABER_HOST") or not push_config.get("MEDIASABER_APIKEY"):
+        return
+    print("Media Saber 服务启动")
+
+    # 构建API URL
+    host = push_config.get("MEDIASABER_HOST").rstrip('/')
+    url = f"{host}/api/v1/message/openSend"
+    
+    # 构建请求数据
+    data = {
+        "title": title,
+        "content": content
+    }
+    
+    # 构建请求头
+    headers = {
+        "Content-Type": "application/json",
+        "apiKey": push_config.get("MEDIASABER_APIKEY")
+    }
+    
+    try:
+        response = requests.post(
+            url=url, 
+            data=json.dumps(data), 
+            headers=headers, 
+            timeout=15
+        )
+        
+        if response.status_code == 200:
+            print("Media Saber 推送成功！")
+        else:
+            print(f"Media Saber 推送失败！状态码：{response.status_code}，响应：{response.text}")
+    except Exception as e:
+        print(f"Media Saber 推送失败！错误：{str(e)}")
+
+
 def parse_headers(headers):
     if not headers:
         return {}
@@ -1128,6 +1172,8 @@ def add_notify_function():
         push_config.get("WXPUSHER_TOPIC_IDS") or push_config.get("WXPUSHER_UIDS")
     ) and is_channel_enabled("wxpusher"):
         notify_function.append(wxpusher_bot)
+    if push_config.get("MEDIASABER_HOST") and push_config.get("MEDIASABER_APIKEY") and is_channel_enabled("mediasaber"):
+        notify_function.append(mediasaber_bot)
     if not notify_function:
         print(f"无推送渠道，请检查通知变量是否正确")
     return notify_function
