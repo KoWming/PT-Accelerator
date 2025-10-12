@@ -2,13 +2,14 @@
 PT-Accelerator 版本信息
 """
 
-__version__ = "2.0.2"
-__version_info__ = (2, 0, 2)
+__version__ = "2.0.3"
+__version_info__ = (2, 0, 3)
 __author__ = "PT-Accelerator Team"
 __description__ = "一个面向PT站点用户的全自动加速与管理平台"
 
 # 版本历史
 VERSION_HISTORY = {
+    "2.0.3": "2025-10-12 - 修复通知渠道关闭状态问题",
     "2.0.2": "2025-10-11 - 添加Media Saber通知渠道",
     "2.0.1": "2025-10-11 - 修复自定义通知配置问题",
     "2.0.0": "2025-09-25 - 架构自适应支持、多通知渠道、移动端适配、Hosts结构保护",

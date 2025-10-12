@@ -83,10 +83,11 @@ def _send_task_notify(title: str, content: str):
             for _, ch_conf in channels.items():
                 if isinstance(ch_conf, dict) and ch_conf.get("enable"):
                     flat_config = flatten_channel(ch_conf)
-                    # 添加渠道启用状态到配置中
+                    # 添加渠道启用状态到配置中，保持原有的启用状态
                     channel_type = ch_conf.get("type", "").lower()
                     if channel_type:
-                        flat_config[f"ENABLE_{channel_type.upper()}"] = True
+                        # 只有当渠道在配置中明确启用时，才设置ENABLE_标志
+                        flat_config[f"ENABLE_{channel_type.upper()}"] = ch_conf.get("enable", False)
                     payloads.append(flat_config)
 
         minimal_keys_sets = [
@@ -1100,10 +1101,11 @@ async def test_notify(payload: Dict[str, Any]):
                 for _, ch_conf in channels_override.items():
                     if isinstance(ch_conf, dict) and ch_conf.get("enable", True):
                         flat_config = flatten_channel(ch_conf)
-                        # 添加渠道启用状态到配置中
+                        # 添加渠道启用状态到配置中，保持原有的启用状态
                         channel_type = ch_conf.get("type", "").lower()
                         if channel_type:
-                            flat_config[f"ENABLE_{channel_type.upper()}"] = True
+                            # 只有当渠道在配置中明确启用时，才设置ENABLE_标志
+                            flat_config[f"ENABLE_{channel_type.upper()}"] = ch_conf.get("enable", False)
                         per_channel_payloads.append(flat_config)
             else:
                 # 顶层键集合 -> 直接作为一次独立发送
@@ -1118,10 +1120,11 @@ async def test_notify(payload: Dict[str, Any]):
             for _, ch_conf in channels.items():
                 if isinstance(ch_conf, dict) and ch_conf.get("enable"):
                     flat_config = flatten_channel(ch_conf)
-                    # 添加渠道启用状态到配置中
+                    # 添加渠道启用状态到配置中，保持原有的启用状态
                     channel_type = ch_conf.get("type", "").lower()
                     if channel_type:
-                        flat_config[f"ENABLE_{channel_type.upper()}"] = True
+                        # 只有当渠道在配置中明确启用时，才设置ENABLE_标志
+                        flat_config[f"ENABLE_{channel_type.upper()}"] = ch_conf.get("enable", False)
                     per_channel_payloads.append(flat_config)
 
         # 过滤无效渠道（最小必需字段校验）
