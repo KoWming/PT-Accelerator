@@ -1,7 +1,7 @@
 from fastapi import FastAPI, Request, Depends, Form, status
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse
 from pathlib import Path
 import os
 import logging
@@ -252,6 +252,16 @@ init_services(hosts_manager, cloudflare_service, scheduler_service, torrent_clie
 # 注册路由 - 在服务初始化之后导入
 from app.api.routes import router as api_router
 app.include_router(api_router, prefix="/api")
+
+# 提供 favicon.ico 文件
+@app.get("/favicon.ico")
+async def favicon():
+    favicon_path = Path(__file__).parent / "templates" / "favicon.ico"
+    if favicon_path.exists():
+        return FileResponse(favicon_path, media_type="image/x-icon")
+    else:
+        from fastapi.responses import Response
+        return Response(status_code=204)  # 如果文件不存在，返回 204 No Content
 
 # 认证相关函数已移动到 app.auth 模块
 

@@ -60,11 +60,37 @@ def _send_task_notify(title: str, content: str):
         channels = notify_cfg.get("channels", {}) or {}
 
         def flatten_channel(ch_conf: Dict[str, Any]) -> Dict[str, Any]:
+            """根据渠道类型，只保留该类型对应的配置项，避免一个渠道触发多种通知"""
+            channel_type = ch_conf.get("type", "").lower()
             flat: Dict[str, Any] = {}
+            
+            # 根据渠道类型，定义该类型需要的配置键
+            type_key_mapping = {
+                "webhook": ["WEBHOOK_URL", "WEBHOOK_METHOD", "WEBHOOK_BODY", "WEBHOOK_HEADERS", "WEBHOOK_CONTENT_TYPE"],
+                "telegram": ["TG_BOT_TOKEN", "TG_USER_ID", "TG_API_HOST", "TG_PROXY_AUTH", "TG_PROXY_HOST", "TG_PROXY_PORT"],
+                "wecom_bot": ["QYWX_KEY", "QYWX_ORIGIN"],
+                "wecom_app": ["QYWX_AM"],
+                "smtp": ["SMTP_SERVER", "SMTP_SSL", "SMTP_EMAIL", "SMTP_PASSWORD", "SMTP_NAME"],
+                "bark": ["BARK_PUSH", "BARK_ARCHIVE", "BARK_GROUP", "BARK_SOUND", "BARK_ICON", "BARK_LEVEL", "BARK_URL"],
+                "wxpusher": ["WXPUSHER_APP_TOKEN", "WXPUSHER_TOPIC_IDS", "WXPUSHER_UIDS"],
+                "gotify": ["GOTIFY_URL", "GOTIFY_TOKEN", "GOTIFY_PRIORITY"],
+                "mediasaber": ["MEDIASABER_HOST", "MEDIASABER_APIKEY"],
+            }
+            
+            # 获取该渠道类型需要的配置键
+            required_keys = type_key_mapping.get(channel_type, [])
+            
+            # 只保留该渠道类型相关的配置项
             for k, v in ch_conf.items():
                 if k in ("name", "type", "enable"):
                     continue
-                flat[k] = v
+                # 如果定义了类型映射，只保留该类型需要的键；否则保留所有键（兼容未定义的类型）
+                if required_keys:
+                    if k.upper() in required_keys:
+                        flat[k] = v
+                else:
+                    flat[k] = v
+            
             # 一言策略：优先渠道内配置，否则用全局
             if "HITOKOTO" in ch_conf:
                 val = ch_conf.get("HITOKOTO")
@@ -106,8 +132,9 @@ def _send_task_notify(title: str, content: str):
                 if all(flat.get(k) for k in keys):
                     valid.append(flat)
                     break
+        # 为每个有效渠道单独发送通知，使用 ignore_default_config=True 避免配置污染
         for flat in valid:
-            notify_module.send(pretty_title, pretty_content, **flat)
+            notify_module.send(pretty_title, pretty_content, ignore_default_config=True, **flat)
     except Exception as e:
         logger.error(f"发送任务结果通知失败: {e}", exc_info=True)
 

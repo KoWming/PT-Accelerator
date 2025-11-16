@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PT-Accelerator v{{ version }}</title>
+    <link rel="icon" href="/favicon.ico" type="image/x-icon">
     <link href="/static/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="/static/css/bootstrap-icons.css">
     <style>
@@ -286,13 +287,28 @@
             border-top: 1px solid rgba(0, 0, 0, 0.05);
             padding: 1.25rem 1.5rem;
         }
+        
+        /* 版本号链接样式 */
+        .version-link {
+            cursor: pointer;
+        }
+        
+        .version-link:hover {
+            background-color: rgba(255, 255, 255, 0.3) !important;
+            color: #ffffff !important;
+            transform: scale(1.05);
+        }
+        
+        .version-link:active {
+            transform: scale(0.98);
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="app-header d-flex justify-content-between align-items-center">
             <div>
-                <h1>PT-Accelerator <span class="ms-2" style="font-size: 0.5em; padding: 0.2em 0.4em; background-color: rgba(255, 255, 255, 0.2); color: #dee2e6; border-radius: 0.25rem; font-weight: normal;">v{{ version }}</span></h1>
+                <h1>PT-Accelerator <a href="https://github.com/KoWming/PT-Accelerator" target="_blank" rel="noopener noreferrer" class="ms-2 version-link" style="font-size: 0.5em; padding: 0.2em 0.4em; background-color: rgba(255, 255, 255, 0.2); color: #dee2e6; border-radius: 0.25rem; font-weight: normal; text-decoration: none; transition: all 0.2s ease;">v{{ version }}</a></h1>
                 <p class="mb-0">优化您的 PT 体验</p>
             </div>
             <div>

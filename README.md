@@ -1,4 +1,4 @@
-# PT-Accelerator v2.0.3
+# PT-Accelerator v2.0.4
 
 一个面向PT站点用户的全自动加速与管理平台，集成Cloudflare IP优选、PT Tracker批量管理、GitHub/TMDB等站点加速、下载器一键导入、Web可视化配置等多种功能，支持Docker一键部署，适合所有对网络加速和PT站点体验有高要求的用户。
 
@@ -314,8 +314,9 @@ python -m uvicorn app.main:app --host 0.0.0.0 --port ${APP_PORT:-23333}
 
 ## 版本更新日志
 
-### 最新版本 (v2.0.3)
+### 最新版本 (v2.0.4)
 
+- ✅ **任务执行时间监控**：添加任务执行时间日志，便于排查和优化
 - ✅ **架构自适应支持**：完美支持AMD64和ARM64架构，自动检测并选择对应的CloudflareSpeedTest文件
 - ✅ **Docker构建优化**：优化Dockerfile，支持架构自适应构建，减小镜像大小
 - ✅ **CI/CD自动化**：集成GitHub Actions，支持自动构建和手动自定义版本发布
@@ -330,6 +331,7 @@ python -m uvicorn app.main:app --host 0.0.0.0 --port ${APP_PORT:-23333}
 
 ### 版本历史
 
+- **v2.0.4** (2025-11-16) - 修复定时任务跳过执行问题、修复多通知渠道重复发送问题
 - **v2.0.3** (2025-10-12) - 修复通知渠道关闭状态问题
 - **v2.0.2** (2025-10-11) - 添加Media Saber通知渠道
 - **v2.0.1** (2025-10-11) - 修复自定义通知配置问题

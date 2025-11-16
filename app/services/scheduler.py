@@ -29,7 +29,14 @@ class SchedulerService:
             except Exception:
                 pass
             self.scheduler = None
-        self.scheduler = BackgroundScheduler()
+        # 配置调度器，设置作业执行器选项
+        self.scheduler = BackgroundScheduler(
+            job_defaults={
+                'max_instances': 1,  # 默认最大实例数为1
+                'coalesce': True,  # 合并延迟的任务
+                'misfire_grace_time': 300  # 错过执行时间后5分钟内仍可执行
+            }
+        )
         self._setup_jobs()
         logger.info("已创建新的调度器实例")
     
@@ -80,6 +87,8 @@ class SchedulerService:
             try:
                 # 创建一个组合任务函数
                 def combined_task():
+                    import time
+                    task_start_time = time.time()
                     logger.info("开始执行组合任务：优选IP + 更新hosts源（严格串行）")
                     # 更新任务状态
                     self.task_status = {"status": "running", "message": "正在执行定时IP优选任务"}
@@ -88,7 +97,8 @@ class SchedulerService:
                         status = self.hosts_manager.get_task_status() if hasattr(self.hosts_manager, 'get_task_status') else {}
                         msg = status.get('message') if isinstance(status, dict) else ("定时IP优选任务完成" if ok else "定时IP优选任务失败")
                         self.task_status = {"status": "done", "message": msg}
-                        logger.info("组合任务完成：优选IP + 更新hosts源（严格串行）")
+                        task_duration = time.time() - task_start_time
+                        logger.info(f"组合任务完成：优选IP + 更新hosts源（严格串行），耗时 {task_duration:.2f} 秒")
                         
                         # 发送定时任务完成通知
                         try:
@@ -100,7 +110,8 @@ class SchedulerService:
                     except Exception as e:
                         error_msg = f"定时任务失败: {str(e)}"
                         self.task_status = {"status": "done", "message": error_msg}
-                        logger.error(f"执行定时任务失败: {str(e)}")
+                        task_duration = time.time() - task_start_time
+                        logger.error(f"执行定时任务失败: {str(e)}，耗时 {task_duration:.2f} 秒", exc_info=True)
                         
                         # 发送定时任务失败通知
                         try:
@@ -109,12 +120,19 @@ class SchedulerService:
                             _send_task_notify("IP优选与Hosts更新", error_msg)
                         except Exception as notify_e:
                             logger.error(f"发送定时任务失败通知失败: {str(notify_e)}")
+                    finally:
+                        # 确保任务状态正确结束
+                        task_duration = time.time() - task_start_time
+                        logger.info(f"定时任务函数执行完毕，总耗时 {task_duration:.2f} 秒")
                 
                 self.scheduler.add_job(
                     combined_task,
                     CronTrigger.from_crontab(cron_expr),
                     id="combined_cloudflare_and_hosts_task",
-                    name="IP优选与Hosts更新定时任务"
+                    name="IP优选与Hosts更新定时任务",
+                    max_instances=1,  # 确保同一时间只有一个实例运行
+                    coalesce=True,  # 如果任务被延迟，合并执行
+                    misfire_grace_time=300  # 如果错过执行时间，5分钟内仍可执行
                 )
                 logger.info(f"已添加组合定时任务(IP优选与Hosts更新)，CRON表达式: {cron_expr}")
             except Exception as e:
