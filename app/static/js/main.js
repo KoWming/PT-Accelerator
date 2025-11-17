@@ -1625,9 +1625,15 @@ async function saveNotifyChannel() {
             const touser = document.getElementById('weapp-touser') ? document.getElementById('weapp-touser').value.trim() : '';
             const agentid = document.getElementById('weapp-agentid') ? document.getElementById('weapp-agentid').value.trim() : '';
             const media = document.getElementById('weapp-mediaid') ? document.getElementById('weapp-mediaid').value.trim() : '';
+            const origin = document.getElementById('weapp-origin') ? document.getElementById('weapp-origin').value.trim() : '';
             const parts = [corpid, corpsecret, touser, agentid].filter(Boolean);
             if (media) parts.push(media);
             channelData.QYWX_AM = parts.join(',');
+            if (origin) {
+                channelData.QYWX_ORIGIN = origin;
+            } else {
+                channelData.QYWX_ORIGIN = '';
+            }
             break;
         }
         case 'wecom_bot':
@@ -1786,18 +1792,6 @@ async function editChannel(channelKey) {
         // 根据类型填充专有字段
         const type = (ch.type || 'webhook');
         switch (type) {
-        case 'wecom_app': {
-            // 将UI字段拼装为后端期望的 QYWX_AM 格式（corpid,corpsecret,touser,agentid[,media_id])
-            const corpid = document.getElementById('weapp-corpid') ? document.getElementById('weapp-corpid').value.trim() : '';
-            const corpsecret = document.getElementById('weapp-corpsecret') ? document.getElementById('weapp-corpsecret').value.trim() : '';
-            const touser = document.getElementById('weapp-touser') ? document.getElementById('weapp-touser').value.trim() : '';
-            const agentid = document.getElementById('weapp-agentid') ? document.getElementById('weapp-agentid').value.trim() : '';
-            const media = document.getElementById('weapp-mediaid') ? document.getElementById('weapp-mediaid').value.trim() : '';
-            const parts = [corpid, corpsecret, touser, agentid].filter(Boolean);
-            if (media) parts.push(media);
-            channelData.QYWX_AM = parts.join(',');
-            break;
-        }
             case 'wecom_app': {
                 const q = ch.QYWX_AM || '';
                 const arr = q.split(',');
@@ -1806,11 +1800,13 @@ async function editChannel(channelKey) {
                 const c3 = document.getElementById('weapp-touser');
                 const c4 = document.getElementById('weapp-agentid');
                 const c5 = document.getElementById('weapp-mediaid');
+                const co = document.getElementById('weapp-origin');
                 if (c1) c1.value = arr[0] || '';
                 if (c2) c2.value = arr[1] || '';
                 if (c3) c3.value = arr[2] || '';
                 if (c4) c4.value = arr[3] || '';
                 if (c5) c5.value = arr[4] || '';
+                if (co) co.value = ch.QYWX_ORIGIN || 'https://qyapi.weixin.qq.com';
                 break;
             }
             case 'igot': {

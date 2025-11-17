@@ -1022,11 +1022,22 @@
                                     </div>
                                 </div>
                             </div>
-                            <div class="form-floating mb-3">
-                                <input type="text" class="form-control" id="weapp-mediaid" placeholder="图文素材media_id(可选)">
-                                <label for="weapp-mediaid">图文素材 media_id (可选)</label>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="form-floating mb-3">
+                                        <input type="text" class="form-control" id="weapp-mediaid" placeholder="图文素材media_id(可选)">
+                                        <label for="weapp-mediaid">图文素材 media_id (可选)</label>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-floating mb-3">
+                                        <input type="text" class="form-control" id="weapp-origin" placeholder="https://qyapi.weixin.qq.com" value="https://qyapi.weixin.qq.com">
+                                        <label for="weapp-origin">转发代理地址 (可选)</label>
+                                    </div>
+                                </div>
                             </div>
                             <div class="form-text mb-2">将以上字段组合为 QYWX_AM: corpid,corpsecret,touser,agentid[,media_id]</div>
+                            <div class="form-text mb-2">说明：企业微信消息的转发代理地址，2022年6月20日后创建的自建应用才需要，其他情况请保持默认 https://qyapi.weixin.qq.com</div>
                         </div>
                         
                         <!-- Telegram配置 -->
