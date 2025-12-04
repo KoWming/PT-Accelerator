@@ -1,4 +1,13 @@
-FROM python:3.11-slim
+# Build stage for Frontend
+FROM node:20-slim AS frontend-builder
+WORKDIR /app/frontend
+COPY frontend/package.json frontend/package-lock.json* ./
+RUN npm install
+COPY frontend .
+RUN npm run build
+
+# Base stage
+FROM python:3.11-slim AS base
 
 # 接收由 buildx 注入的架构变量（常见值：amd64、arm64）
 ARG TARGETARCH
@@ -33,3 +42,11 @@ EXPOSE ${APP_PORT}
 
 # 启动应用
 CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${APP_PORT}"]
+
+# Standard build target (no frontend)
+FROM base AS standard
+
+# Dev build target (with frontend)
+FROM base AS with-frontend
+# 复制前端构建产物
+COPY --from=frontend-builder /app/frontend/dist /app/frontend/dist

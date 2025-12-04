@@ -1,7 +1,7 @@
 from fastapi import FastAPI, Request, Depends, Form, status
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse, Response, JSONResponse
 from pathlib import Path
 import os
 import logging
@@ -230,15 +230,215 @@ app = FastAPI(title="PT-Accelerator")
 # 确保在所有路由之前添加中间件
 if config.get("auth", {}).get("secret_key"):
     app.add_middleware(SessionMiddleware, secret_key=config["auth"]["secret_key"])
+# 创建必要的目录（已提前创建，保留以防未来调整调用顺序）
+os.makedirs("logs", exist_ok=True)
+os.makedirs("config", exist_ok=True)
+
+# 初始化配置
+CONFIG_PATH = "config/config.yaml"
+DEFAULT_CLOUDFLARE_IP = "104.16.91.215"
+DEFAULT_CONFIG = {
+    "cloudflare": {
+        "enable": True,
+        "cron": "0 0 * * *",  # 每天零点运行
+        "ipv6": False,
+        "additional_args": "",
+        "notify": True
+    },
+    "trackers": [
+        {
+            "name": "示例Tracker",
+            "domain": "tracker.example.com",
+            "enable": True,
+            "ip": DEFAULT_CLOUDFLARE_IP
+        }
+    ],
+    "hosts_sources": [
+        {
+            "name": "GitHub（Gitlab源）",
+            "url": "https://gitlab.com/ineo6/hosts/-/raw/master/next-hosts",
+            "enable": True
+        },
+        {
+            "name": "GitHub（Gitee源）",
+            "url": "https://gitee.com/godfather1103/github-hosts/raw/master/hosts",
+            "enable": True
+        },
+        {
+            "name": "TMDB（Gitee源）",
+            "url": "https://gitee.com/nirvanaalex/hosts/raw/master/hosts",
+            "enable": True
+        },
+        {
+            "name": "TMDB（GitHub源1）",
+            "url": "https://ghfast.top/https://raw.githubusercontent.com/cnwikee/CheckTMDB/refs/heads/main/Tmdb_host_ipv4",
+            "enable": True
+        },
+        {
+            "name": "TMDB（GitHub源2）",
+            "url": "https://ghfast.top/https://raw.githubusercontent.com/ChenXinBest/hosts_check/refs/heads/master/hosts.txt",
+            "enable": True
+        },
+        {
+            "name": "GitHub&TMDB（GitHub源3）",
+            "url": "https://ghfast.top/https://raw.githubusercontent.com/kekylin/hosts/main/hosts",
+            "enable": True
+        },
+        {
+            "name": "GitHub520",
+            "url": "https://ghfast.top/https://raw.githubusercontent.com/521xueweihan/GitHub520/refs/heads/main/hosts",
+            "enable": True
+        }
+    ],
+    "torrent_clients": [
+        {
+            "id": "qb_default",
+            "name": "qBittorrent 默认",
+            "type": "qbittorrent",
+            "host": "localhost",
+            "port": 8080,
+            "username": "",
+            "password": "",
+            "use_https": False,
+            "enable": False
+        },
+        {
+            "id": "tr_default", 
+            "name": "Transmission 默认",
+            "type": "transmission",
+            "host": "localhost",
+            "port": 9091,
+            "username": "",
+            "password": "",
+            "use_https": False,
+            "path": "/transmission/rpc",
+            "enable": False
+        }
+    ],
+    "auth": {
+        "enable": False,
+        "username": "admin",
+        "password_hash": "",
+        "secret_key": ""
+    }
+}
+
+
+# 创建nowip_hosts.txt文件，确保cfst_hosts.sh脚本能正常运行
+def create_nowip_file():
+    # 检查文件是否存在
+    if not os.path.exists("nowip_hosts.txt"):
+        try:
+            with open("nowip_hosts.txt", "w") as f:
+                f.write(DEFAULT_CLOUDFLARE_IP)
+            logger.info(f"成功创建nowip_hosts.txt文件，内容为: {DEFAULT_CLOUDFLARE_IP}")
+        except Exception as e:
+            logger.error(f"创建nowip_hosts.txt文件失败: {str(e)}")
+    
+    # 检查cfst_linux_amd64目录下是否也需要此文件
+    cfst_dir = "cfst_linux_amd64"
+    if os.path.exists(cfst_dir) and not os.path.exists(os.path.join(cfst_dir, "nowip_hosts.txt")):
+        try:
+            with open(os.path.join(cfst_dir, "nowip_hosts.txt"), "w") as f:
+                f.write(DEFAULT_CLOUDFLARE_IP)
+            logger.info(f"成功在{cfst_dir}目录下创建nowip_hosts.txt文件")
+        except Exception as e:
+            logger.error(f"在{cfst_dir}目录下创建nowip_hosts.txt文件失败: {str(e)}")
+
+# 加载或创建配置文件
+def load_config():
+    if not os.path.exists(CONFIG_PATH):
+        with open(CONFIG_PATH, 'w', encoding='utf-8') as f:
+            if not DEFAULT_CONFIG["auth"].get("secret_key"):
+                DEFAULT_CONFIG["auth"]["secret_key"] = secrets.token_hex(32)
+            yaml.dump(DEFAULT_CONFIG, f, default_flow_style=False, allow_unicode=True)
+        current_config = DEFAULT_CONFIG
+    else:
+        # 读取配置：UTF-8优先，回退GBK/GB18030
+        try:
+            with open(CONFIG_PATH, 'r', encoding='utf-8') as f:
+                current_config = yaml.safe_load(f)
+        except UnicodeDecodeError:
+            try:
+                with open(CONFIG_PATH, 'r', encoding='gbk') as f:
+                    current_config = yaml.safe_load(f)
+            except UnicodeDecodeError:
+                with open(CONFIG_PATH, 'r', encoding='gb18030') as f:
+                    current_config = yaml.safe_load(f)
+        
+        if not current_config:
+            current_config = DEFAULT_CONFIG.copy()
+
+        need_save_after_load = False
+        if "auth" not in current_config:
+            current_config["auth"] = DEFAULT_CONFIG["auth"].copy()
+            if not current_config["auth"].get("secret_key"):
+                current_config["auth"]["secret_key"] = secrets.token_hex(32)
+            need_save_after_load = True
+        elif not current_config["auth"].get("secret_key"):
+            current_config["auth"]["secret_key"] = secrets.token_hex(32)
+            need_save_after_load = True
+
+        for key, value in DEFAULT_CONFIG.items():
+            if key not in current_config:
+                current_config[key] = value
+        
+        if "cloudflare" in current_config:
+            if "ipv4" in current_config["cloudflare"]:
+                logger.info("从配置中移除废弃的ipv4字段")
+                del current_config["cloudflare"]["ipv4"]
+                need_save_after_load = True
+        
+        if need_save_after_load:
+            with open(CONFIG_PATH, 'w', encoding='utf-8') as f:
+                yaml.dump(current_config, f, default_flow_style=False, allow_unicode=True)
+
+    # 初始化认证模块的 session_serializer
+    if current_config.get("auth", {}).get("secret_key"):
+        init_session_serializer(current_config["auth"]["secret_key"])
+    else:
+        # 这是一个后备，理论上 secret_key 应该总是存在
+        fallback_secret = secrets.token_hex(32)
+        current_config["auth"]["secret_key"] = fallback_secret # 更新到当前配置中，以便后续保存
+        init_session_serializer(fallback_secret)
+        logger.warning("配置文件中未找到 secret_key，已生成临时的 secret_key。请检查配置文件。")
+        # 尝试保存回文件
+        try:
+            with open(CONFIG_PATH, 'w', encoding='utf-8') as f:
+                yaml.dump(current_config, f, default_flow_style=False, allow_unicode=True)
+            logger.info("已将生成的临时 secret_key 保存回配置文件。")
+        except Exception as e:
+            logger.error(f"保存临时 secret_key 到配置文件失败: {e}")
+            
+    return current_config
+
+# 创建nowip_hosts.txt文件
+create_nowip_file()
+
+# 服务初始化
+config = load_config()
+
+# 创建应用
+app = FastAPI(title="PT-Accelerator")
+
+# 添加 SessionMiddleware, secret_key 从配置中读取
+# 确保在所有路由之前添加中间件
+if config.get("auth", {}).get("secret_key"):
+    app.add_middleware(SessionMiddleware, secret_key=config["auth"]["secret_key"])
 else:
     # 如果到这里 secret_key 仍然没有，这是个严重问题，但为了应用能启动，用一个固定值（不推荐生产环境）
     logger.error("CRITICAL: Secret key for session middleware is not set. Using a temporary insecure key.")
     app.add_middleware(SessionMiddleware, secret_key="temporary_insecure_secret_key_please_change")
 
-# 挂载静态文件
-app.mount("/static", StaticFiles(directory=Path(__file__).parent / "static"), name="static")
+# 挂载静态文件 (旧版)
+# app.mount("/static", StaticFiles(directory=Path(__file__).parent / "static"), name="static")
 
-# 模板
+# 新版前端静态资源
+frontend_dist = Path(__file__).parent.parent / "frontend" / "dist"
+if (frontend_dist / "assets").exists():
+    app.mount("/assets", StaticFiles(directory=frontend_dist / "assets"), name="assets")
+
+# 模板 (旧版保留但不再主要使用)
 templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
 hosts_manager = HostsManager(config)
 cloudflare_service = CloudflareSpeedTestService(config, hosts_manager)
@@ -256,24 +456,35 @@ app.include_router(api_router, prefix="/api")
 # 提供 favicon.ico 文件
 @app.get("/favicon.ico")
 async def favicon():
+    # 优先使用新版前端的 favicon
+    if (frontend_dist / "favicon.ico").exists():
+        return FileResponse(frontend_dist / "favicon.ico")
+    
     favicon_path = Path(__file__).parent / "templates" / "favicon.ico"
     if favicon_path.exists():
         return FileResponse(favicon_path, media_type="image/x-icon")
     else:
         from fastapi.responses import Response
-        return Response(status_code=204)  # 如果文件不存在，返回 204 No Content
+        return Response(status_code=204)
 
 # 认证相关函数已移动到 app.auth 模块
 
-# 登录页面
-@app.get("/login", response_class=HTMLResponse)
-async def login_page(request: Request, error_message: Optional[str] = None):
-    csrf_token = secrets.token_hex(32)
-    request.session["csrf_token"] = csrf_token
-    return templates.TemplateResponse("login.html", {"request": request, "error_message": error_message, "csrf_token": csrf_token})
+# 获取 CSRF Token (用于 SPA)
+@app.get("/api/csrf")
+def get_csrf_token(request: Request):
+    if "csrf_token" not in request.session:
+        request.session["csrf_token"] = secrets.token_hex(32)
+    return {"token": request.session["csrf_token"]}
+
+# 旧版登录页面 (已废弃，由 SPA 接管)
+# @app.get("/login", response_class=HTMLResponse)
+# async def login_page(request: Request, error_message: Optional[str] = None):
+#     csrf_token = secrets.token_hex(32)
+#     request.session["csrf_token"] = csrf_token
+#     return templates.TemplateResponse("login.html", {"request": request, "error_message": error_message, "csrf_token": csrf_token})
 
 
-# 登录处理
+# 登录处理 (保持不变，但 SPA 会使用 /api/csrf 获取 token)
 @app.post("/login")
 async def login_for_access_token(
     request: Request,
@@ -291,6 +502,11 @@ async def login_for_access_token(
         # 生成新的 CSRF token
         new_csrf_token = secrets.token_hex(32)
         request.session["csrf_token"] = new_csrf_token
+        # SPA 应该处理 400 或 403，这里返回 JSON 错误更合适，但为了兼容性暂且这样
+        # 如果是 AJAX 请求，返回 JSON
+        if "application/json" in request.headers.get("accept", ""):
+             return JSONResponse({"detail": "无效的请求，请刷新页面重试"}, status_code=400)
+        
         return templates.TemplateResponse("login.html", {
             "request": request, 
             "error_message": "无效的请求，请刷新页面重试。",
@@ -305,6 +521,9 @@ async def login_for_access_token(
         # 生成新的 CSRF token
         new_csrf_token = secrets.token_hex(32)
         request.session["csrf_token"] = new_csrf_token
+        if "application/json" in request.headers.get("accept", ""):
+             return JSONResponse({"detail": "管理员密码尚未设置"}, status_code=400)
+             
         return templates.TemplateResponse("login.html", {
             "request": request, 
             "error_message": "管理员密码尚未设置，请重启容器并查看应用日志获取临时密码。",
@@ -316,12 +535,20 @@ async def login_for_access_token(
         user_session_data = create_user_session(username)
         request.session["user"] = user_session_data
         # 登录成功后重定向到主页
+        # 对于 SPA，返回 JSON 成功信息
+        if "application/json" in request.headers.get("accept", ""):
+             return {"success": True, "message": "登录成功"}
+             
         response = RedirectResponse(url="/", status_code=status.HTTP_302_FOUND)
         return response
     
     # 登录失败时生成新的 CSRF token
     new_csrf_token = secrets.token_hex(32)
     request.session["csrf_token"] = new_csrf_token
+    
+    if "application/json" in request.headers.get("accept", ""):
+         return JSONResponse({"detail": "用户名或密码错误"}, status_code=400)
+
     return templates.TemplateResponse("login.html", {
         "request": request, 
         "error_message": "用户名或密码错误",
@@ -332,25 +559,45 @@ async def login_for_access_token(
 @app.get("/logout")
 async def logout(request: Request):
     request.session.pop("user", None)
+    if "application/json" in request.headers.get("accept", ""):
+         return {"success": True, "message": "已登出"}
     response = RedirectResponse(url="/login", status_code=status.HTTP_302_FOUND)
     return response
 
 # 主页
-@app.get("/", response_class=HTMLResponse)
-async def home(request: Request, current_user: Optional[User] = Depends(get_current_user)):
-    # 实时读取最新配置，而不是使用全局变量
-    from app.auth import load_current_config
-    current_config = load_current_config()
+# @app.get("/", response_class=HTMLResponse)
+# async def home(request: Request, current_user: Optional[User] = Depends(get_current_user)):
+#     # 实时读取最新配置，而不是使用全局变量
+#     from app.auth import load_current_config
+#     current_config = load_current_config()
     
-    if current_config.get("auth", {}).get("enable") and not current_user:
-        return RedirectResponse(url="/login", status_code=status.HTTP_302_FOUND)
+#     if current_config.get("auth", {}).get("enable") and not current_user:
+#         return RedirectResponse(url="/login", status_code=status.HTTP_302_FOUND)
     
-    # 如果认证未启用，或者用户已登录，则显示主页
-    # 确保传递最新的 config 到模板
-    return templates.TemplateResponse(
-        "index.html", 
-        {"request": request, "config": current_config, "current_user": current_user, "version": get_version()}
-    )
+#     # 如果认证未启用，或者用户已登录，则显示主页
+#     # 确保传递最新的 config 到模板
+#     return templates.TemplateResponse(
+#         "index.html", 
+#         {"request": request, "config": current_config, "current_user": current_user, "version": get_version()}
+#     )
+
+# SPA Catch-all 路由 (替代旧版主页)
+@app.get("/{full_path:path}")
+async def serve_spa(request: Request, full_path: str):
+    # 如果是 API 请求，返回 404 (由 api_router 处理，这里只处理未匹配的)
+    if full_path.startswith("api/"):
+        return Response(status_code=404)
+        
+    # 尝试提供静态文件 (如 robots.txt 等)
+    static_file = frontend_dist / full_path
+    if static_file.is_file():
+        return FileResponse(static_file)
+
+    # 默认返回 index.html
+    if (frontend_dist / "index.html").exists():
+        return FileResponse(frontend_dist / "index.html")
+    
+    return "Frontend not built. Please run 'npm run build' in frontend directory.", 500
 
 # 运行时更新配置
 @app.on_event("startup")

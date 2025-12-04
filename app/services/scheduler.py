@@ -46,15 +46,22 @@ class SchedulerService:
         old_config = self.config
         self.config = config
         
-        # 检查CRON是否变更
-        old_cron = old_config.get("cloudflare", {}).get("cron", "0 0 * * *")
-        new_cron = config.get("cloudflare", {}).get("cron", "0 0 * * *")
-        if old_cron != new_cron:
-            logger.info(f"CRON表达式已更新: {old_cron} -> {new_cron}")
+        # 检查CRON是否变更 (Cloudflare 或 Backup)
+        old_cf_cron = old_config.get("cloudflare", {}).get("cron", "0 0 * * *")
+        new_cf_cron = config.get("cloudflare", {}).get("cron", "0 0 * * *")
+        
+        old_bk_cron = old_config.get("backup", {}).get("cron", "0 2 * * *")
+        new_bk_cron = config.get("backup", {}).get("cron", "0 2 * * *")
+        
+        # 检查启用状态变更
+        old_bk_enable = old_config.get("backup", {}).get("enable", False)
+        new_bk_enable = config.get("backup", {}).get("enable", False)
+
+        if (old_cf_cron != new_cf_cron) or (old_bk_cron != new_bk_cron) or (old_bk_enable != new_bk_enable):
+            logger.info("定时任务配置变更，需要重启调度器")
             
             # 如果调度器正在运行，需要重启调度器
             if self.is_running():
-                logger.info("由于CRON表达式变更，需要重启调度器")
                 self.stop()
                 self._create_scheduler()
                 self.start()
@@ -63,7 +70,7 @@ class SchedulerService:
                 self._setup_jobs()
         else:
             # CRON未变更，只需要更新配置
-            logger.info("CRON表达式未变更，无需重启调度器")
+            logger.info("定时任务配置未变更，无需重启调度器")
     
     def _setup_jobs(self):
         """设置定时任务"""
@@ -139,6 +146,41 @@ class SchedulerService:
                 logger.error(f"添加组合定时任务失败: {str(e)}")
         else:
             logger.info("CloudflareSpeedTest优选功能已禁用，不添加相关定时任务")
+
+        # 添加备份定时任务
+        backup_config = self.config.get("backup", {})
+        if backup_config.get("enable", False):
+            cron_expr = backup_config.get("cron", "0 2 * * *")  # 默认每天凌晨2点
+            logger.info(f"准备添加备份定时任务，CRON表达式: {cron_expr}")
+            
+            try:
+                def backup_task():
+                    logger.info("开始执行定时备份任务")
+                    from app.services.backup_service import BackupService
+                    backup_service = BackupService()
+                    # 重新读取最新配置，确保使用最新凭据
+                    from app.api.routes import get_config
+                    current_config = get_config()
+                    
+                    if backup_service.backup_config(current_config):
+                        logger.info("定时备份任务完成")
+                    else:
+                        logger.error("定时备份任务失败")
+                
+                self.scheduler.add_job(
+                    backup_task,
+                    CronTrigger.from_crontab(cron_expr),
+                    id="backup_config_task",
+                    name="配置备份定时任务",
+                    max_instances=1,
+                    coalesce=True,
+                    misfire_grace_time=300
+                )
+                logger.info(f"已添加备份定时任务，CRON表达式: {cron_expr}")
+            except Exception as e:
+                logger.error(f"添加备份定时任务失败: {str(e)}")
+        else:
+            logger.info("备份功能已禁用，不添加备份定时任务")
     
     def start(self):
         """启动调度器"""

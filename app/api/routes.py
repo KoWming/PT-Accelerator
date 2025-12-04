@@ -3,7 +3,7 @@ from fastapi.responses import JSONResponse
 import yaml
 import os
 import logging
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from pydantic import BaseModel
 import re
 from croniter import croniter
@@ -204,6 +204,26 @@ async def update_config(
         logger.error(f"更新配置失败: {str(e)}")
         raise HTTPException(status_code=500, detail=f"更新配置失败: {str(e)}")
 
+# 获取认证状态
+@router.get("/auth/status")
+async def get_auth_status(current_user: Optional[User] = Depends(get_current_user)):
+    config = get_config()
+    auth_enable = config.get("auth", {}).get("enable", False)
+    
+    # 如果认证未启用，视为已认证（作为guest或admin）
+    if not auth_enable:
+        return {
+            "is_authenticated": True,
+            "user": {"username": "admin", "is_authenticated": True},
+            "auth_enabled": False
+        }
+    
+    return {
+        "is_authenticated": current_user.is_authenticated if current_user else False,
+        "user": current_user,
+        "auth_enabled": True
+    }
+
 # 新增：更新认证配置的 API
 @router.post("/auth/config", dependencies=[Depends(get_current_user)])
 async def update_auth_config(
@@ -216,6 +236,7 @@ async def update_auth_config(
     current_user: User = Depends(get_current_user)
 ):
     """更新认证配置，包括启用/禁用、用户名和密码"""
+    logger.info(f"收到认证配置更新请求: enable_auth={enable_auth}, username={username}, has_current_password={bool(current_password)}, has_new_password={bool(new_password)}")
     current_config = get_config()
     
     if current_config.get("auth", {}).get("enable") and (not current_user or current_user.username == "guest"):
@@ -245,7 +266,9 @@ async def update_auth_config(
         
         if not current_password:
             # 如果没有提供当前密码，检查是否允许这样做
-            if not auth_settings.get("password_hash") or not auth_settings.get("enable"):
+            # 使用原始配置检查认证是否启用，因为auth_settings可能已被修改
+            original_enable = current_config.get("auth", {}).get("enable")
+            if not auth_settings.get("password_hash") or not original_enable:
                 # 首次设置密码或认证被禁用时可以不需要当前密码
                 auth_settings["password_hash"] = get_password_hash(new_password)
                 config_changed = True
@@ -678,6 +701,94 @@ async def get_current_hosts(
     except Exception as e:
         logger.error(f"获取hosts失败: {str(e)}")
         raise HTTPException(status_code=500, detail=f"获取hosts失败: {str(e)}")
+
+# ===== 备份管理API =====
+
+@router.post("/backup/test")
+async def test_backup_connection(
+    config: Dict[str, Any]
+):
+    """测试WebDav连接"""
+    try:
+        from app.services.backup_service import BackupService
+        service = BackupService()
+        
+        url = config.get("webdav_url")
+        username = config.get("webdav_username")
+        password = config.get("webdav_password")
+        
+        if service.test_connection(url, username, password):
+            return {"success": True, "message": "连接测试成功"}
+        else:
+            return {"success": False, "message": "连接测试失败，请检查配置"}
+    except Exception as e:
+        logger.error(f"测试连接失败: {str(e)}")
+        return {"success": False, "message": f"测试连接失败: {str(e)}"}
+
+@router.post("/backup/run")
+async def run_backup(
+    background_tasks: BackgroundTasks
+):
+    """手动执行备份"""
+    try:
+        def backup_task():
+            from app.services.backup_service import BackupService
+            service = BackupService()
+            config = get_config()
+            if service.backup_config(config):
+                logger.info("手动备份成功")
+            else:
+                logger.error("手动备份失败")
+        
+        background_tasks.add_task(backup_task)
+        return {"message": "备份任务已启动"}
+    except Exception as e:
+        logger.error(f"启动备份任务失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"启动备份任务失败: {str(e)}")
+
+@router.get("/backup/list")
+async def list_backups():
+    """获取备份列表"""
+    try:
+        from app.services.backup_service import BackupService
+        service = BackupService()
+        config = get_config()
+        backups = service.list_backups(config)
+        return {"success": True, "backups": backups}
+    except Exception as e:
+        logger.error(f"获取备份列表失败: {str(e)}")
+        return {"success": False, "message": f"获取备份列表失败: {str(e)}"}
+
+@router.post("/backup/restore")
+async def restore_backup(payload: Dict[str, Any], hosts_manager: HostsManager = Depends(get_hosts_manager)):
+    """恢复备份"""
+    try:
+        filename = payload.get("filename")
+        if not filename:
+            return {"success": False, "message": "未指定文件名"}
+            
+        from app.services.backup_service import BackupService
+        service = BackupService()
+        config = get_config()
+        
+        if service.restore_backup(config, filename):
+            # Try to reload config
+            try:
+                import app.main
+                # Reload config from file
+                with open(CONFIG_PATH, 'r', encoding='utf-8') as f:
+                    new_config = yaml.safe_load(f)
+                app.main.config = new_config
+                hosts_manager.update_config(new_config)
+            except Exception as e:
+                logger.error(f"重载配置失败: {e}")
+                
+            return {"success": True, "message": "配置已恢复，建议刷新页面"}
+        else:
+            return {"success": False, "message": "恢复失败，请查看日志"}
+    except Exception as e:
+        logger.error(f"恢复备份失败: {str(e)}")
+        return {"success": False, "message": f"恢复备份失败: {str(e)}"}
 
 # ===== 添加新的模型和API端点 =====
 
@@ -1375,3 +1486,49 @@ async def save_hosts_content(
     except Exception as e:
         logger.error(f"保存hosts失败: {str(e)}")
         raise HTTPException(status_code=500, detail=f"保存hosts失败: {str(e)}")
+
+# 测试通知渠道
+@router.post("/notify/test/{channel_key}")
+async def test_notify_channel(
+    channel_key: str,
+    background_tasks: BackgroundTasks
+):
+    """测试指定通知渠道"""
+    try:
+        config = get_config()
+        notify_cfg = config.get("notify", {})
+        channels = notify_cfg.get("channels", {})
+        
+        if channel_key not in channels:
+            raise HTTPException(status_code=404, detail="通知渠道不存在")
+            
+        channel_config = channels[channel_key]
+        
+        # 构造测试消息
+        title = "🔔 PT-Accelerator测试通知："
+        content = f"这是一条来自 【{channel_config.get('name', channel_key)}】通知渠道 的测试消息！\n发送时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+        
+        # 展平配置 (参考 _send_task_notify)
+        flat_config = {}
+        for k, v in channel_config.items():
+            if k not in ("name", "type", "enable"):
+                flat_config[k] = v
+        
+        # 确保包含必要的类型特定字段 (简单处理：全部传入)
+        # 并在后台发送
+        def send_test():
+            try:
+                # 强制启用以便测试
+                flat_config[f"ENABLE_{channel_config.get('type', '').upper()}"] = True
+                notify_module.send(title, content, ignore_default_config=True, **flat_config)
+            except Exception as e:
+                logger.error(f"测试通知发送失败: {e}")
+
+        background_tasks.add_task(send_test)
+        
+        return {"message": "测试消息已发送"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"测试通知失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"测试通知失败: {str(e)}")

@@ -633,12 +633,17 @@ class HostsManager:
                     script_path = "cfst_linux_amd64/cfst_hosts.sh"
             logger.info("开始执行严格串行的优选IP+更新tracker+更新hosts流程")
             best_ip = None
+            old_ip = None
             if os.path.exists(script_path):
                 self.task_status = {"status": "running", "message": "正在运行Cloudflare优选脚本"}
                 result = subprocess.run(["bash", script_path], capture_output=True, text=True)
                 if result.returncode == 0:
                     logger.info(f"脚本执行成功: {result.stdout}")
                     for line in result.stdout.splitlines():
+                        if "旧 IP 为" in line:
+                            parts = line.split("旧 IP 为")
+                            if len(parts) > 1:
+                                old_ip = parts[1].strip()
                         if "找到最优IP" in line or "新 IP 为" in line:
                             if "新 IP 为" in line:
                                 parts = line.split("新 IP 为")
@@ -792,7 +797,39 @@ class HostsManager:
             for line in log_lines:
                 logger.info(line)
             self._save_merged_hosts_backup(merged_dict)
-            self.task_status = {"status": "done", "message": f"Cloudflare优选完成！IP: {best_ip}，已更新 {len(filtered_trackers) if isinstance(filtered_trackers, list) else 0} 个Tracker和 {total_entries} 条hosts记录"}
+            # 构建详细的通知消息
+            msg_lines = ["✅ Cloudflare优选完成！"]
+            # 这里假设 old_ip 可以从某处获取，或者如果无法获取就省略
+            # 目前代码中没有显式记录 old_ip，暂且只显示新IP
+            # 如果需要显示旧IP，需要在更新前记录 best_cloudflare_ip
+            msg_lines.append(f"旧 IP 为：{old_ip}") 
+            msg_lines.append(f"新 IP 为：{best_ip}")
+            
+            # 尝试获取测速耗时，这里简单用 total_time 或者从脚本输出解析
+            # 由于脚本输出解析较复杂，这里暂时用总耗时代替，或者省略
+            msg_lines.append(f"测速耗时：{latency}ms")
+
+            tracker_count = len(filtered_trackers) if isinstance(filtered_trackers, list) else 0
+            msg_lines.append(f"已更新： {tracker_count} 个Tracker和 {total_entries} 条hosts记录")
+            
+            if log_lines:
+                msg_lines.append("兜底保留：")
+                # 筛选出兜底相关的日志
+                fallback_logs = [line for line in log_lines if "兜底" in line]
+                for log in fallback_logs:
+                     # 格式化日志输出，使其更接近用户要求的格式
+                     # 例如: "域名 domain 选用IP: ip，延迟: ms" -> "域名：domain\n保留上次IP：ip"
+                     # 这里做简单的文本转换
+                     if "保留上次IP" in log:
+                         parts = log.split("保留上次IP:")
+                         if len(parts) > 1:
+                             domain_part = parts[0].split("域名")[1].split("本次")[0].strip()
+                             ip_part = parts[1].strip()
+                             msg_lines.append(f"域名：{domain_part}")
+                             msg_lines.append(f"保留上次IP：{ip_part}")
+
+            final_message = "\n".join(msg_lines)
+            self.task_status = {"status": "done", "message": final_message}
             self.task_running = False
             logger.info("已完成hosts文件更新")
             if self.pending_update:

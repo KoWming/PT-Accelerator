@@ -11,6 +11,7 @@ import smtplib
 from email.mime.text import MIMEText
 from email.header import Header
 from email.utils import formataddr
+from functools import partial
 
 import requests
 import logging
@@ -176,18 +177,19 @@ for k in push_config:
 
 
 @channel("bark")
-def bark(title: str, content: str) -> None:
+def bark(title: str, content: str, config=None) -> None:
     """
     使用 bark 推送消息。
     """
-    if not push_config.get("BARK_PUSH"):
+    cfg = config or push_config
+    if not cfg.get("BARK_PUSH"):
         return
     print("bark 服务启动")
 
-    if push_config.get("BARK_PUSH").startswith("http"):
-        url = f'{push_config.get("BARK_PUSH")}'
+    if cfg.get("BARK_PUSH").startswith("http"):
+        url = f'{cfg.get("BARK_PUSH")}'
     else:
-        url = f'https://api.day.app/{push_config.get("BARK_PUSH")}'
+        url = f'https://api.day.app/{cfg.get("BARK_PUSH")}'
 
     bark_params = {
         "BARK_ARCHIVE": "isArchive",
@@ -206,7 +208,7 @@ def bark(title: str, content: str) -> None:
         and pairs[0] != "BARK_PUSH"
         and pairs[1]
         and bark_params.get(pairs[0]),
-        push_config.items(),
+        cfg.items(),
     ):
         data[bark_params.get(pair[0])] = pair[1]
     headers = {"Content-Type": "application/json;charset=utf-8"}
@@ -221,7 +223,7 @@ def bark(title: str, content: str) -> None:
 
 
 @channel("console")
-def console(title: str, content: str) -> None:
+def console(title: str, content: str, config=None) -> None:
     """
     使用 控制台 推送消息。
     """
@@ -229,23 +231,24 @@ def console(title: str, content: str) -> None:
 
 
 @channel("dingding")
-def dingding_bot(title: str, content: str) -> None:
+def dingding_bot(title: str, content: str, config=None) -> None:
     """
     使用 钉钉机器人 推送消息。
     """
-    if not push_config.get("DD_BOT_SECRET") or not push_config.get("DD_BOT_TOKEN"):
+    cfg = config or push_config
+    if not cfg.get("DD_BOT_SECRET") or not cfg.get("DD_BOT_TOKEN"):
         return
     print("钉钉机器人 服务启动")
 
     timestamp = str(round(time.time() * 1000))
-    secret_enc = push_config.get("DD_BOT_SECRET").encode("utf-8")
-    string_to_sign = "{}\n{}".format(timestamp, push_config.get("DD_BOT_SECRET"))
+    secret_enc = cfg.get("DD_BOT_SECRET").encode("utf-8")
+    string_to_sign = "{}\n{}".format(timestamp, cfg.get("DD_BOT_SECRET"))
     string_to_sign_enc = string_to_sign.encode("utf-8")
     hmac_code = hmac.new(
         secret_enc, string_to_sign_enc, digestmod=hashlib.sha256
     ).digest()
     sign = urllib.parse.quote_plus(base64.b64encode(hmac_code))
-    url = f'https://oapi.dingtalk.com/robot/send?access_token={push_config.get("DD_BOT_TOKEN")}&timestamp={timestamp}&sign={sign}'
+    url = f'https://oapi.dingtalk.com/robot/send?access_token={cfg.get("DD_BOT_TOKEN")}&timestamp={timestamp}&sign={sign}'
     headers = {"Content-Type": "application/json;charset=utf-8"}
     data = {"msgtype": "text", "text": {"content": f"{title}\n\n{content}"}}
     response = requests.post(
@@ -259,15 +262,16 @@ def dingding_bot(title: str, content: str) -> None:
 
 
 @channel("feishu")
-def feishu_bot(title: str, content: str) -> None:
+def feishu_bot(title: str, content: str, config=None) -> None:
     """
     使用 飞书机器人 推送消息。
     """
-    if not push_config.get("FSKEY"):
+    cfg = config or push_config
+    if not cfg.get("FSKEY"):
         return
     print("飞书 服务启动")
 
-    url = f'https://open.feishu.cn/open-apis/bot/v2/hook/{push_config.get("FSKEY")}'
+    url = f'https://open.feishu.cn/open-apis/bot/v2/hook/{cfg.get("FSKEY")}'
     data = {"msg_type": "text", "content": {"text": f"{title}\n\n{content}"}}
     response = requests.post(url, data=json.dumps(data)).json()
 
@@ -278,15 +282,16 @@ def feishu_bot(title: str, content: str) -> None:
 
 
 @channel("go_cqhttp")
-def go_cqhttp(title: str, content: str) -> None:
+def go_cqhttp(title: str, content: str, config=None) -> None:
     """
     使用 go_cqhttp 推送消息。
     """
-    if not push_config.get("GOBOT_URL") or not push_config.get("GOBOT_QQ"):
+    cfg = config or push_config
+    if not cfg.get("GOBOT_URL") or not cfg.get("GOBOT_QQ"):
         return
     print("go-cqhttp 服务启动")
 
-    url = f'{push_config.get("GOBOT_URL")}?access_token={push_config.get("GOBOT_TOKEN")}&{push_config.get("GOBOT_QQ")}&message=标题:{title}\n内容:{content}'
+    url = f'{cfg.get("GOBOT_URL")}?access_token={cfg.get("GOBOT_TOKEN")}&{cfg.get("GOBOT_QQ")}&message=标题:{title}\n内容:{content}'
     response = requests.get(url).json()
 
     if response["status"] == "ok":
@@ -296,19 +301,20 @@ def go_cqhttp(title: str, content: str) -> None:
 
 
 @channel("gotify")
-def gotify(title: str, content: str) -> None:
+def gotify(title: str, content: str, config=None) -> None:
     """
     使用 gotify 推送消息。
     """
-    if not push_config.get("GOTIFY_URL") or not push_config.get("GOTIFY_TOKEN"):
+    cfg = config or push_config
+    if not cfg.get("GOTIFY_URL") or not cfg.get("GOTIFY_TOKEN"):
         return
     print("gotify 服务启动")
 
-    url = f'{push_config.get("GOTIFY_URL")}/message?token={push_config.get("GOTIFY_TOKEN")}'
+    url = f'{cfg.get("GOTIFY_URL")}/message?token={cfg.get("GOTIFY_TOKEN")}'
     data = {
         "title": title,
         "message": content,
-        "priority": push_config.get("GOTIFY_PRIORITY"),
+        "priority": cfg.get("GOTIFY_PRIORITY"),
     }
     response = requests.post(url, data=data).json()
 
@@ -319,15 +325,16 @@ def gotify(title: str, content: str) -> None:
 
 
 @channel("igot")
-def iGot(title: str, content: str) -> None:
+def iGot(title: str, content: str, config=None) -> None:
     """
     使用 iGot 推送消息。
     """
-    if not push_config.get("IGOT_PUSH_KEY"):
+    cfg = config or push_config
+    if not cfg.get("IGOT_PUSH_KEY"):
         return
     print("iGot 服务启动")
 
-    url = f'https://push.hellyw.com/{push_config.get("IGOT_PUSH_KEY")}'
+    url = f'https://push.hellyw.com/{cfg.get("IGOT_PUSH_KEY")}'
     data = {"title": title, "content": content}
     headers = {"Content-Type": "application/x-www-form-urlencoded"}
     response = requests.post(url, data=data, headers=headers).json()
@@ -339,22 +346,23 @@ def iGot(title: str, content: str) -> None:
 
 
 @channel("serverj")
-def serverJ(title: str, content: str) -> None:
+def serverJ(title: str, content: str, config=None) -> None:
     """
     通过 serverJ 推送消息。
     """
-    if not push_config.get("PUSH_KEY"):
+    cfg = config or push_config
+    if not cfg.get("PUSH_KEY"):
         return
     print("serverJ 服务启动")
 
     data = {"text": title, "desp": content.replace("\n", "\n\n")}
 
-    match = re.match(r"sctp(\d+)t", push_config.get("PUSH_KEY"))
+    match = re.match(r"sctp(\d+)t", cfg.get("PUSH_KEY"))
     if match:
         num = match.group(1)
-        url = f'https://{num}.push.ft07.com/send/{push_config.get("PUSH_KEY")}.send'
+        url = f'https://{num}.push.ft07.com/send/{cfg.get("PUSH_KEY")}.send'
     else:
-        url = f'https://sctapi.ftqq.com/{push_config.get("PUSH_KEY")}.send'
+        url = f'https://sctapi.ftqq.com/{cfg.get("PUSH_KEY")}.send'
 
     response = requests.post(url, data=data).json()
 
@@ -365,22 +373,23 @@ def serverJ(title: str, content: str) -> None:
 
 
 @channel("pushdeer")
-def pushdeer(title: str, content: str) -> None:
+def pushdeer(title: str, content: str, config=None) -> None:
     """
     通过PushDeer 推送消息
     """
-    if not push_config.get("DEER_KEY"):
+    cfg = config or push_config
+    if not cfg.get("DEER_KEY"):
         return
     print("PushDeer 服务启动")
     data = {
         "text": title,
         "desp": content,
         "type": "markdown",
-        "pushkey": push_config.get("DEER_KEY"),
+        "pushkey": cfg.get("DEER_KEY"),
     }
     url = "https://api2.pushdeer.com/message/push"
-    if push_config.get("DEER_URL"):
-        url = push_config.get("DEER_URL")
+    if cfg.get("DEER_URL"):
+        url = cfg.get("DEER_URL")
 
     response = requests.post(url, data=data).json()
 
@@ -391,15 +400,16 @@ def pushdeer(title: str, content: str) -> None:
 
 
 @channel("chat")
-def chat(title: str, content: str) -> None:
+def chat(title: str, content: str, config=None) -> None:
     """
     通过Chat 推送消息
     """
-    if not push_config.get("CHAT_URL") or not push_config.get("CHAT_TOKEN"):
+    cfg = config or push_config
+    if not cfg.get("CHAT_URL") or not cfg.get("CHAT_TOKEN"):
         return
     print("chat 服务启动")
     data = "payload=" + json.dumps({"text": title + "\n" + content})
-    url = push_config.get("CHAT_URL") + push_config.get("CHAT_TOKEN")
+    url = cfg.get("CHAT_URL") + cfg.get("CHAT_TOKEN")
     response = requests.post(url, data=data)
 
     if response.status_code == 200:
@@ -409,25 +419,26 @@ def chat(title: str, content: str) -> None:
 
 
 @channel("pushplus")
-def pushplus_bot(title: str, content: str) -> None:
+def pushplus_bot(title: str, content: str, config=None) -> None:
     """
     通过 pushplus 推送消息。
     """
-    if not push_config.get("PUSH_PLUS_TOKEN"):
+    cfg = config or push_config
+    if not cfg.get("PUSH_PLUS_TOKEN"):
         return
     print("PUSHPLUS 服务启动")
 
     url = "https://www.pushplus.plus/send"
     data = {
-        "token": push_config.get("PUSH_PLUS_TOKEN"),
+        "token": cfg.get("PUSH_PLUS_TOKEN"),
         "title": title,
         "content": content,
-        "topic": push_config.get("PUSH_PLUS_USER"),
-        "template": push_config.get("PUSH_PLUS_TEMPLATE"),
-        "channel": push_config.get("PUSH_PLUS_CHANNEL"),
-        "webhook": push_config.get("PUSH_PLUS_WEBHOOK"),
-        "callbackUrl": push_config.get("PUSH_PLUS_CALLBACKURL"),
-        "to": push_config.get("PUSH_PLUS_TO"),
+        "topic": cfg.get("PUSH_PLUS_USER"),
+        "template": cfg.get("PUSH_PLUS_TEMPLATE"),
+        "channel": cfg.get("PUSH_PLUS_CHANNEL"),
+        "webhook": cfg.get("PUSH_PLUS_WEBHOOK"),
+        "callbackUrl": cfg.get("PUSH_PLUS_CALLBACKURL"),
+        "to": cfg.get("PUSH_PLUS_TO"),
     }
     body = json.dumps(data).encode(encoding="utf-8")
     headers = {"Content-Type": "application/json"}
@@ -455,11 +466,12 @@ def pushplus_bot(title: str, content: str) -> None:
 
 
 @channel("weplus")
-def weplus_bot(title: str, content: str) -> None:
+def weplus_bot(title: str, content: str, config=None) -> None:
     """
     通过 微加机器人 推送消息。
     """
-    if not push_config.get("WE_PLUS_BOT_TOKEN"):
+    cfg = config or push_config
+    if not cfg.get("WE_PLUS_BOT_TOKEN"):
         return
     print("微加机器人 服务启动")
 
@@ -469,12 +481,12 @@ def weplus_bot(title: str, content: str) -> None:
 
     url = "https://www.weplusbot.com/send"
     data = {
-        "token": push_config.get("WE_PLUS_BOT_TOKEN"),
+        "token": cfg.get("WE_PLUS_BOT_TOKEN"),
         "title": title,
         "content": content,
         "template": template,
-        "receiver": push_config.get("WE_PLUS_BOT_RECEIVER"),
-        "version": push_config.get("WE_PLUS_BOT_VERSION"),
+        "receiver": cfg.get("WE_PLUS_BOT_RECEIVER"),
+        "version": cfg.get("WE_PLUS_BOT_VERSION"),
     }
     body = json.dumps(data).encode(encoding="utf-8")
     headers = {"Content-Type": "application/json"}
@@ -487,15 +499,16 @@ def weplus_bot(title: str, content: str) -> None:
 
 
 @channel("qmsg")
-def qmsg_bot(title: str, content: str) -> None:
+def qmsg_bot(title: str, content: str, config=None) -> None:
     """
     使用 qmsg 推送消息。
     """
-    if not push_config.get("QMSG_KEY") or not push_config.get("QMSG_TYPE"):
+    cfg = config or push_config
+    if not cfg.get("QMSG_KEY") or not cfg.get("QMSG_TYPE"):
         return
     print("qmsg 服务启动")
 
-    url = f'https://qmsg.zendee.cn/{push_config.get("QMSG_TYPE")}/{push_config.get("QMSG_KEY")}'
+    url = f'https://qmsg.zendee.cn/{cfg.get("QMSG_TYPE")}/{cfg.get("QMSG_KEY")}'
     payload = {"msg": f'{title}\n\n{content.replace("----", "-")}'.encode("utf-8")}
     response = requests.post(url=url, params=payload).json()
 
@@ -506,13 +519,14 @@ def qmsg_bot(title: str, content: str) -> None:
 
 
 @channel("wecom_app")
-def wecom_app(title: str, content: str) -> None:
+def wecom_app(title: str, content: str, config=None) -> None:
     """
     通过 企业微信 APP 推送消息。
     """
-    if not push_config.get("QYWX_AM"):
+    cfg = config or push_config
+    if not cfg.get("QYWX_AM"):
         return
-    QYWX_AM_AY = re.split(",", push_config.get("QYWX_AM"))
+    QYWX_AM_AY = re.split(",", cfg.get("QYWX_AM"))
     if 4 < len(QYWX_AM_AY) > 5:
         print("QYWX_AM 设置错误!!")
         return
@@ -526,7 +540,7 @@ def wecom_app(title: str, content: str) -> None:
         media_id = QYWX_AM_AY[4]
     except IndexError:
         media_id = ""
-    wx = WeCom(corpid, corpsecret, agentid)
+    wx = WeCom(corpid, corpsecret, agentid, config=cfg)
     # 如果没有配置 media_id 默认就以 text 方式发送
     if not media_id:
         message = title + "\n\n" + content
@@ -541,13 +555,14 @@ def wecom_app(title: str, content: str) -> None:
 
 
 class WeCom:
-    def __init__(self, corpid, corpsecret, agentid):
+    def __init__(self, corpid, corpsecret, agentid, config=None):
         self.CORPID = corpid
         self.CORPSECRET = corpsecret
         self.AGENTID = agentid
         self.ORIGIN = "https://qyapi.weixin.qq.com"
-        if push_config.get("QYWX_ORIGIN"):
-            self.ORIGIN = push_config.get("QYWX_ORIGIN")
+        cfg = config or push_config
+        if cfg.get("QYWX_ORIGIN"):
+            self.ORIGIN = cfg.get("QYWX_ORIGIN")
 
     def get_access_token(self):
         url = f"{self.ORIGIN}/cgi-bin/gettoken"
@@ -603,19 +618,20 @@ class WeCom:
 
 
 @channel("wecom_bot")
-def wecom_bot(title: str, content: str) -> None:
+def wecom_bot(title: str, content: str, config=None) -> None:
     """
     通过 企业微信机器人 推送消息。
     """
-    if not push_config.get("QYWX_KEY"):
+    cfg = config or push_config
+    if not cfg.get("QYWX_KEY"):
         return
     print("企业微信机器人服务启动")
 
     origin = "https://qyapi.weixin.qq.com"
-    if push_config.get("QYWX_ORIGIN"):
-        origin = push_config.get("QYWX_ORIGIN")
+    if cfg.get("QYWX_ORIGIN"):
+        origin = cfg.get("QYWX_ORIGIN")
 
-    url = f"{origin}/cgi-bin/webhook/send?key={push_config.get('QYWX_KEY')}"
+    url = f"{origin}/cgi-bin/webhook/send?key={cfg.get('QYWX_KEY')}"
     headers = {"Content-Type": "application/json;charset=utf-8"}
     data = {"msgtype": "text", "text": {"content": f"{title}\n\n{content}"}}
     response = requests.post(
@@ -629,38 +645,39 @@ def wecom_bot(title: str, content: str) -> None:
 
 
 @channel("telegram")
-def telegram_bot(title: str, content: str) -> None:
+def telegram_bot(title: str, content: str, config=None) -> None:
     """
     使用 telegram 机器人 推送消息。
     """
-    if not push_config.get("TG_BOT_TOKEN") or not push_config.get("TG_USER_ID"):
+    cfg = config or push_config
+    if not cfg.get("TG_BOT_TOKEN") or not cfg.get("TG_USER_ID"):
         return
     print("tg 服务启动")
 
-    if push_config.get("TG_API_HOST"):
-        url = f"{push_config.get('TG_API_HOST')}/bot{push_config.get('TG_BOT_TOKEN')}/sendMessage"
+    if cfg.get("TG_API_HOST"):
+        url = f"{cfg.get('TG_API_HOST')}/bot{cfg.get('TG_BOT_TOKEN')}/sendMessage"
     else:
         url = (
-            f"https://api.telegram.org/bot{push_config.get('TG_BOT_TOKEN')}/sendMessage"
+            f"https://api.telegram.org/bot{cfg.get('TG_BOT_TOKEN')}/sendMessage"
         )
     headers = {"Content-Type": "application/x-www-form-urlencoded"}
     payload = {
-        "chat_id": str(push_config.get("TG_USER_ID")),
+        "chat_id": str(cfg.get("TG_USER_ID")),
         "text": f"{title}\n\n{content}",
         "disable_web_page_preview": "true",
     }
     proxies = None
-    if push_config.get("TG_PROXY_HOST") and push_config.get("TG_PROXY_PORT"):
-        if push_config.get("TG_PROXY_AUTH") is not None and "@" not in push_config.get(
+    if cfg.get("TG_PROXY_HOST") and cfg.get("TG_PROXY_PORT"):
+        if cfg.get("TG_PROXY_AUTH") is not None and "@" not in cfg.get(
             "TG_PROXY_HOST"
         ):
-            push_config["TG_PROXY_HOST"] = (
-                push_config.get("TG_PROXY_AUTH")
+            cfg["TG_PROXY_HOST"] = (
+                cfg.get("TG_PROXY_AUTH")
                 + "@"
-                + push_config.get("TG_PROXY_HOST")
+                + cfg.get("TG_PROXY_HOST")
             )
         proxyStr = "http://{}:{}".format(
-            push_config.get("TG_PROXY_HOST"), push_config.get("TG_PROXY_PORT")
+            cfg.get("TG_PROXY_HOST"), cfg.get("TG_PROXY_PORT")
         )
         proxies = {"http": proxyStr, "https": proxyStr}
     response = requests.post(
@@ -674,30 +691,31 @@ def telegram_bot(title: str, content: str) -> None:
 
 
 @channel("aibotk")
-def aibotk(title: str, content: str) -> None:
+def aibotk(title: str, content: str, config=None) -> None:
     """
     使用 智能微秘书 推送消息。
     """
+    cfg = config or push_config
     if (
-        not push_config.get("AIBOTK_KEY")
-        or not push_config.get("AIBOTK_TYPE")
-        or not push_config.get("AIBOTK_NAME")
+        not cfg.get("AIBOTK_KEY")
+        or not cfg.get("AIBOTK_TYPE")
+        or not cfg.get("AIBOTK_NAME")
     ):
         return
     print("智能微秘书 服务启动")
 
-    if push_config.get("AIBOTK_TYPE") == "room":
+    if cfg.get("AIBOTK_TYPE") == "room":
         url = "https://api-bot.aibotk.com/openapi/v1/chat/room"
         data = {
-            "apiKey": push_config.get("AIBOTK_KEY"),
-            "roomName": push_config.get("AIBOTK_NAME"),
+            "apiKey": cfg.get("AIBOTK_KEY"),
+            "roomName": cfg.get("AIBOTK_NAME"),
             "message": {"type": 1, "content": f"【青龙快讯】\n\n{title}\n{content}"},
         }
     else:
         url = "https://api-bot.aibotk.com/openapi/v1/chat/contact"
         data = {
-            "apiKey": push_config.get("AIBOTK_KEY"),
-            "name": push_config.get("AIBOTK_NAME"),
+            "apiKey": cfg.get("AIBOTK_KEY"),
+            "name": cfg.get("AIBOTK_NAME"),
             "message": {"type": 1, "content": f"【青龙快讯】\n\n{title}\n{content}"},
         }
     body = json.dumps(data).encode(encoding="utf-8")
@@ -711,16 +729,17 @@ def aibotk(title: str, content: str) -> None:
 
 
 @channel("smtp")
-def smtp(title: str, content: str) -> None:
+def smtp(title: str, content: str, config=None) -> None:
     """
     使用 SMTP 邮件 推送消息。
     """
+    cfg = config or push_config
     if (
-        not push_config.get("SMTP_SERVER")
-        or not push_config.get("SMTP_SSL")
-        or not push_config.get("SMTP_EMAIL")
-        or not push_config.get("SMTP_PASSWORD")
-        or not push_config.get("SMTP_NAME")
+        not cfg.get("SMTP_SERVER")
+        or not cfg.get("SMTP_SSL")
+        or not cfg.get("SMTP_EMAIL")
+        or not cfg.get("SMTP_PASSWORD")
+        or not cfg.get("SMTP_NAME")
     ):
         return
     print("SMTP 邮件 服务启动")
@@ -728,30 +747,30 @@ def smtp(title: str, content: str) -> None:
     message = MIMEText(content, "plain", "utf-8")
     message["From"] = formataddr(
         (
-            Header(push_config.get("SMTP_NAME"), "utf-8").encode(),
-            push_config.get("SMTP_EMAIL"),
+            Header(cfg.get("SMTP_NAME"), "utf-8").encode(),
+            cfg.get("SMTP_EMAIL"),
         )
     )
     message["To"] = formataddr(
         (
-            Header(push_config.get("SMTP_NAME"), "utf-8").encode(),
-            push_config.get("SMTP_EMAIL"),
+            Header(cfg.get("SMTP_NAME"), "utf-8").encode(),
+            cfg.get("SMTP_EMAIL"),
         )
     )
     message["Subject"] = Header(title, "utf-8")
 
     try:
         smtp_server = (
-            smtplib.SMTP_SSL(push_config.get("SMTP_SERVER"))
-            if push_config.get("SMTP_SSL") == "true"
-            else smtplib.SMTP(push_config.get("SMTP_SERVER"))
+            smtplib.SMTP_SSL(cfg.get("SMTP_SERVER"))
+            if cfg.get("SMTP_SSL") == "true"
+            else smtplib.SMTP(cfg.get("SMTP_SERVER"))
         )
         smtp_server.login(
-            push_config.get("SMTP_EMAIL"), push_config.get("SMTP_PASSWORD")
+            cfg.get("SMTP_EMAIL"), cfg.get("SMTP_PASSWORD")
         )
         smtp_server.sendmail(
-            push_config.get("SMTP_EMAIL"),
-            push_config.get("SMTP_EMAIL"),
+            cfg.get("SMTP_EMAIL"),
+            cfg.get("SMTP_EMAIL"),
             message.as_bytes(),
         )
         smtp_server.close()
@@ -761,25 +780,26 @@ def smtp(title: str, content: str) -> None:
 
 
 @channel("pushme")
-def pushme(title: str, content: str) -> None:
+def pushme(title: str, content: str, config=None) -> None:
     """
     使用 PushMe 推送消息。
     """
-    if not push_config.get("PUSHME_KEY"):
+    cfg = config or push_config
+    if not cfg.get("PUSHME_KEY"):
         return
     print("PushMe 服务启动")
 
     url = (
-        push_config.get("PUSHME_URL")
-        if push_config.get("PUSHME_URL")
+        cfg.get("PUSHME_URL")
+        if cfg.get("PUSHME_URL")
         else "https://push.i-i.me/"
     )
     data = {
-        "push_key": push_config.get("PUSHME_KEY"),
+        "push_key": cfg.get("PUSHME_KEY"),
         "title": title,
         "content": content,
-        "date": push_config.get("date") if push_config.get("date") else "",
-        "type": push_config.get("type") if push_config.get("type") else "",
+        "date": cfg.get("date") if cfg.get("date") else "",
+        "type": cfg.get("type") if cfg.get("type") else "",
     }
     response = requests.post(url, data=data)
 
@@ -790,26 +810,27 @@ def pushme(title: str, content: str) -> None:
 
 
 @channel("chronocat")
-def chronocat(title: str, content: str) -> None:
+def chronocat(title: str, content: str, config=None) -> None:
     """
     使用 CHRONOCAT 推送消息。
     """
+    cfg = config or push_config
     if (
-        not push_config.get("CHRONOCAT_URL")
-        or not push_config.get("CHRONOCAT_QQ")
-        or not push_config.get("CHRONOCAT_TOKEN")
+        not cfg.get("CHRONOCAT_URL")
+        or not cfg.get("CHRONOCAT_QQ")
+        or not cfg.get("CHRONOCAT_TOKEN")
     ):
         return
 
     print("CHRONOCAT 服务启动")
 
-    user_ids = re.findall(r"user_id=(\d+)", push_config.get("CHRONOCAT_QQ"))
-    group_ids = re.findall(r"group_id=(\d+)", push_config.get("CHRONOCAT_QQ"))
+    user_ids = re.findall(r"user_id=(\d+)", cfg.get("CHRONOCAT_QQ"))
+    group_ids = re.findall(r"group_id=(\d+)", cfg.get("CHRONOCAT_QQ"))
 
-    url = f'{push_config.get("CHRONOCAT_URL")}/api/message/send'
+    url = f'{cfg.get("CHRONOCAT_URL")}/api/message/send'
     headers = {
         "Content-Type": "application/json",
-        "Authorization": f'Bearer {push_config.get("CHRONOCAT_TOKEN")}',
+        "Authorization": f'Bearer {cfg.get("CHRONOCAT_TOKEN")}',
     }
 
     for chat_type, ids in [(1, user_ids), (2, group_ids)]:
@@ -839,10 +860,11 @@ def chronocat(title: str, content: str) -> None:
 
 
 @channel("ntfy")
-def ntfy(title: str, content: str) -> None:
+def ntfy(title: str, content: str, config=None) -> None:
     """
     通过 Ntfy 推送消息
     """
+    cfg = config or push_config
 
     def encode_rfc2047(text: str) -> str:
         """将文本编码为符合 RFC 2047 标准的格式"""
@@ -850,14 +872,14 @@ def ntfy(title: str, content: str) -> None:
         encoded_str = encoded_bytes.decode("utf-8")
         return f"=?utf-8?B?{encoded_str}?="
 
-    if not push_config.get("NTFY_TOPIC"):
+    if not cfg.get("NTFY_TOPIC"):
         return
     print("ntfy 服务启动")
     priority = "3"
-    if not push_config.get("NTFY_PRIORITY"):
+    if not cfg.get("NTFY_PRIORITY"):
         print("ntfy 服务的NTFY_PRIORITY 未设置!!默认设置为3")
     else:
-        priority = push_config.get("NTFY_PRIORITY")
+        priority = cfg.get("NTFY_PRIORITY")
 
     # 使用 RFC 2047 编码 title
     encoded_title = encode_rfc2047(title)
@@ -865,7 +887,7 @@ def ntfy(title: str, content: str) -> None:
     data = content.encode(encoding="utf-8")
     headers = {"Title": encoded_title, "Priority": priority}  # 使用编码后的 title
 
-    url = push_config.get("NTFY_URL") + "/" + push_config.get("NTFY_TOPIC")
+    url = cfg.get("NTFY_URL") + "/" + cfg.get("NTFY_TOPIC")
     response = requests.post(url, data=data, headers=headers)
     if response.status_code == 200:  # 使用 response.status_code 进行检查
         print("Ntfy 推送成功！")
@@ -874,7 +896,7 @@ def ntfy(title: str, content: str) -> None:
 
 
 @channel("wxpusher")
-def wxpusher_bot(title: str, content: str) -> None:
+def wxpusher_bot(title: str, content: str, config=None) -> None:
     """
     通过 wxpusher 推送消息。
     支持的环境变量:
@@ -882,25 +904,26 @@ def wxpusher_bot(title: str, content: str) -> None:
     - WXPUSHER_TOPIC_IDS: 主题ID, 多个用英文分号;分隔
     - WXPUSHER_UIDS: 用户ID, 多个用英文分号;分隔
     """
-    if not push_config.get("WXPUSHER_APP_TOKEN"):
+    cfg = config or push_config
+    if not cfg.get("WXPUSHER_APP_TOKEN"):
         return
 
     url = "https://wxpusher.zjiecode.com/api/send/message"
 
     # 处理topic_ids和uids，将分号分隔的字符串转为数组
     topic_ids = []
-    if push_config.get("WXPUSHER_TOPIC_IDS"):
+    if cfg.get("WXPUSHER_TOPIC_IDS"):
         topic_ids = [
             int(id.strip())
-            for id in push_config.get("WXPUSHER_TOPIC_IDS").split(";")
+            for id in cfg.get("WXPUSHER_TOPIC_IDS").split(";")
             if id.strip()
         ]
 
     uids = []
-    if push_config.get("WXPUSHER_UIDS"):
+    if cfg.get("WXPUSHER_UIDS"):
         uids = [
             uid.strip()
-            for uid in push_config.get("WXPUSHER_UIDS").split(";")
+            for uid in cfg.get("WXPUSHER_UIDS").split(";")
             if uid.strip()
         ]
 
@@ -912,7 +935,7 @@ def wxpusher_bot(title: str, content: str) -> None:
     print("wxpusher 服务启动")
 
     data = {
-        "appToken": push_config.get("WXPUSHER_APP_TOKEN"),
+        "appToken": cfg.get("WXPUSHER_APP_TOKEN"),
         "content": f"<h1>{title}</h1><br/><div style='white-space: pre-wrap;'>{content}</div>",
         "summary": title,
         "contentType": 2,
@@ -931,16 +954,17 @@ def wxpusher_bot(title: str, content: str) -> None:
 
 
 @channel("mediasaber")
-def mediasaber_bot(title: str, content: str) -> None:
+def mediasaber_bot(title: str, content: str, config=None) -> None:
     """
     使用 Media Saber 推送消息。
     """
-    if not push_config.get("MEDIASABER_HOST") or not push_config.get("MEDIASABER_APIKEY"):
+    cfg = config or push_config
+    if not cfg.get("MEDIASABER_HOST") or not cfg.get("MEDIASABER_APIKEY"):
         return
     print("Media Saber 服务启动")
 
     # 构建API URL
-    host = push_config.get("MEDIASABER_HOST").rstrip('/')
+    host = cfg.get("MEDIASABER_HOST").rstrip('/')
     url = f"{host}/api/v1/message/openSend"
     
     # 构建请求数据
@@ -952,7 +976,7 @@ def mediasaber_bot(title: str, content: str) -> None:
     # 构建请求头
     headers = {
         "Content-Type": "application/json",
-        "apiKey": push_config.get("MEDIASABER_APIKEY")
+        "apiKey": cfg.get("MEDIASABER_APIKEY")
     }
     
     try:
@@ -1045,20 +1069,21 @@ def parse_body(body, content_type, value_format_fn=None):
 
 
 @channel("webhook")
-def custom_notify(title: str, content: str) -> None:
+def custom_notify(title: str, content: str, config=None) -> None:
     """
     通过 自定义通知 推送消息。
     """
-    if not push_config.get("WEBHOOK_URL") or not push_config.get("WEBHOOK_METHOD"):
+    cfg = config or push_config
+    if not cfg.get("WEBHOOK_URL") or not cfg.get("WEBHOOK_METHOD"):
         return
 
     print("自定义通知服务启动")
 
-    WEBHOOK_URL = push_config.get("WEBHOOK_URL")
-    WEBHOOK_METHOD = push_config.get("WEBHOOK_METHOD")
-    WEBHOOK_CONTENT_TYPE = push_config.get("WEBHOOK_CONTENT_TYPE")
-    WEBHOOK_BODY = push_config.get("WEBHOOK_BODY")
-    WEBHOOK_HEADERS = push_config.get("WEBHOOK_HEADERS")
+    WEBHOOK_URL = cfg.get("WEBHOOK_URL")
+    WEBHOOK_METHOD = cfg.get("WEBHOOK_METHOD")
+    WEBHOOK_CONTENT_TYPE = cfg.get("WEBHOOK_CONTENT_TYPE")
+    WEBHOOK_BODY = cfg.get("WEBHOOK_BODY")
+    WEBHOOK_HEADERS = cfg.get("WEBHOOK_HEADERS")
 
     if "$title" not in WEBHOOK_URL and "$title" not in WEBHOOK_BODY:
         print("请求头或者请求体中必须包含 $title 和 $content")
@@ -1099,93 +1124,93 @@ def one() -> str:
     return res["hitokoto"] + "    ----" + res["from"]
 
 
-def add_notify_function():
+def add_notify_function(config=None):
     notify_function = []
+    cfg = config or push_config
     
     # 检查通知渠道是否启用（通过ENABLE_前缀的配置项）
     def is_channel_enabled(channel_name):
         enable_key = f"ENABLE_{channel_name.upper()}"
-        return push_config.get(enable_key, True)  # 默认为启用状态
+        return cfg.get(enable_key, True)  # 默认为启用状态
     
-    if push_config.get("BARK_PUSH") and is_channel_enabled("bark"):
-        notify_function.append(bark)
-    if push_config.get("CONSOLE") and is_channel_enabled("console"):
-        notify_function.append(console)
-    if push_config.get("DD_BOT_TOKEN") and push_config.get("DD_BOT_SECRET") and is_channel_enabled("dingding"):
-        notify_function.append(dingding_bot)
-    if push_config.get("FSKEY") and is_channel_enabled("feishu"):
-        notify_function.append(feishu_bot)
-    if push_config.get("GOBOT_URL") and push_config.get("GOBOT_QQ") and is_channel_enabled("go_cqhttp"):
-        notify_function.append(go_cqhttp)
-    if push_config.get("GOTIFY_URL") and push_config.get("GOTIFY_TOKEN") and is_channel_enabled("gotify"):
-        notify_function.append(gotify)
-    if push_config.get("IGOT_PUSH_KEY") and is_channel_enabled("igot"):
-        notify_function.append(iGot)
-    if push_config.get("PUSH_KEY") and is_channel_enabled("serverj"):
-        notify_function.append(serverJ)
-    if push_config.get("DEER_KEY") and is_channel_enabled("pushdeer"):
-        notify_function.append(pushdeer)
-    if push_config.get("CHAT_URL") and push_config.get("CHAT_TOKEN") and is_channel_enabled("chat"):
-        notify_function.append(chat)
-    if push_config.get("PUSH_PLUS_TOKEN") and is_channel_enabled("pushplus"):
-        notify_function.append(pushplus_bot)
-    if push_config.get("WE_PLUS_BOT_TOKEN") and is_channel_enabled("weplus"):
-        notify_function.append(weplus_bot)
-    if push_config.get("QMSG_KEY") and push_config.get("QMSG_TYPE") and is_channel_enabled("qmsg"):
-        notify_function.append(qmsg_bot)
-    if push_config.get("QYWX_AM") and is_channel_enabled("wecom_app"):
-        notify_function.append(wecom_app)
-    if push_config.get("QYWX_KEY") and is_channel_enabled("wecom_bot"):
-        notify_function.append(wecom_bot)
-    if push_config.get("TG_BOT_TOKEN") and push_config.get("TG_USER_ID") and is_channel_enabled("telegram"):
-        notify_function.append(telegram_bot)
+    if cfg.get("BARK_PUSH") and is_channel_enabled("bark"):
+        notify_function.append(partial(bark, config=cfg))
+    if cfg.get("CONSOLE") and is_channel_enabled("console"):
+        notify_function.append(partial(console, config=cfg))
+    if cfg.get("DD_BOT_TOKEN") and cfg.get("DD_BOT_SECRET") and is_channel_enabled("dingding"):
+        notify_function.append(partial(dingding_bot, config=cfg))
+    if cfg.get("FSKEY") and is_channel_enabled("feishu"):
+        notify_function.append(partial(feishu_bot, config=cfg))
+    if cfg.get("GOBOT_URL") and cfg.get("GOBOT_QQ") and is_channel_enabled("go_cqhttp"):
+        notify_function.append(partial(go_cqhttp, config=cfg))
+    if cfg.get("GOTIFY_URL") and cfg.get("GOTIFY_TOKEN") and is_channel_enabled("gotify"):
+        notify_function.append(partial(gotify, config=cfg))
+    if cfg.get("IGOT_PUSH_KEY") and is_channel_enabled("igot"):
+        notify_function.append(partial(iGot, config=cfg))
+    if cfg.get("PUSH_KEY") and is_channel_enabled("serverj"):
+        notify_function.append(partial(serverJ, config=cfg))
+    if cfg.get("DEER_KEY") and is_channel_enabled("pushdeer"):
+        notify_function.append(partial(pushdeer, config=cfg))
+    if cfg.get("CHAT_URL") and cfg.get("CHAT_TOKEN") and is_channel_enabled("chat"):
+        notify_function.append(partial(chat, config=cfg))
+    if cfg.get("PUSH_PLUS_TOKEN") and is_channel_enabled("pushplus"):
+        notify_function.append(partial(pushplus_bot, config=cfg))
+    if cfg.get("WE_PLUS_BOT_TOKEN") and is_channel_enabled("weplus"):
+        notify_function.append(partial(weplus_bot, config=cfg))
+    if cfg.get("QMSG_KEY") and cfg.get("QMSG_TYPE") and is_channel_enabled("qmsg"):
+        notify_function.append(partial(qmsg_bot, config=cfg))
+    if cfg.get("QYWX_AM") and is_channel_enabled("wecom_app"):
+        notify_function.append(partial(wecom_app, config=cfg))
+    if cfg.get("QYWX_KEY") and is_channel_enabled("wecom_bot"):
+        notify_function.append(partial(wecom_bot, config=cfg))
+    if cfg.get("TG_BOT_TOKEN") and cfg.get("TG_USER_ID") and is_channel_enabled("telegram"):
+        notify_function.append(partial(telegram_bot, config=cfg))
     if (
-        push_config.get("AIBOTK_KEY")
-        and push_config.get("AIBOTK_TYPE")
-        and push_config.get("AIBOTK_NAME")
+        cfg.get("AIBOTK_KEY")
+        and cfg.get("AIBOTK_TYPE")
+        and cfg.get("AIBOTK_NAME")
         and is_channel_enabled("aibotk")
     ):
-        notify_function.append(aibotk)
+        notify_function.append(partial(aibotk, config=cfg))
     if (
-        push_config.get("SMTP_SERVER")
-        and push_config.get("SMTP_SSL")
-        and push_config.get("SMTP_EMAIL")
-        and push_config.get("SMTP_PASSWORD")
-        and push_config.get("SMTP_NAME")
+        cfg.get("SMTP_SERVER")
+        and cfg.get("SMTP_SSL")
+        and cfg.get("SMTP_EMAIL")
+        and cfg.get("SMTP_PASSWORD")
+        and cfg.get("SMTP_NAME")
         and is_channel_enabled("smtp")
     ):
-        notify_function.append(smtp)
-    if push_config.get("PUSHME_KEY") and is_channel_enabled("pushme"):
-        notify_function.append(pushme)
+        notify_function.append(partial(smtp, config=cfg))
+    if cfg.get("PUSHME_KEY") and is_channel_enabled("pushme"):
+        notify_function.append(partial(pushme, config=cfg))
     if (
-        push_config.get("CHRONOCAT_URL")
-        and push_config.get("CHRONOCAT_QQ")
-        and push_config.get("CHRONOCAT_TOKEN")
+        cfg.get("CHRONOCAT_URL")
+        and cfg.get("CHRONOCAT_QQ")
+        and cfg.get("CHRONOCAT_TOKEN")
         and is_channel_enabled("chronocat")
     ):
-        notify_function.append(chronocat)
-    if push_config.get("WEBHOOK_URL") and push_config.get("WEBHOOK_METHOD") and is_channel_enabled("webhook"):
-        notify_function.append(custom_notify)
-    if push_config.get("NTFY_TOPIC") and is_channel_enabled("ntfy"):
-        notify_function.append(ntfy)
-    if push_config.get("WXPUSHER_APP_TOKEN") and (
-        push_config.get("WXPUSHER_TOPIC_IDS") or push_config.get("WXPUSHER_UIDS")
+        notify_function.append(partial(chronocat, config=cfg))
+    if cfg.get("WEBHOOK_URL") and cfg.get("WEBHOOK_METHOD") and is_channel_enabled("webhook"):
+        notify_function.append(partial(custom_notify, config=cfg))
+    if cfg.get("NTFY_TOPIC") and is_channel_enabled("ntfy"):
+        notify_function.append(partial(ntfy, config=cfg))
+    if cfg.get("WXPUSHER_APP_TOKEN") and (
+        cfg.get("WXPUSHER_TOPIC_IDS") or cfg.get("WXPUSHER_UIDS")
     ) and is_channel_enabled("wxpusher"):
-        notify_function.append(wxpusher_bot)
-    if push_config.get("MEDIASABER_HOST") and push_config.get("MEDIASABER_APIKEY") and is_channel_enabled("mediasaber"):
-        notify_function.append(mediasaber_bot)
+        notify_function.append(partial(wxpusher_bot, config=cfg))
+    if cfg.get("MEDIASABER_HOST") and cfg.get("MEDIASABER_APIKEY") and is_channel_enabled("mediasaber"):
+        notify_function.append(partial(mediasaber_bot, config=cfg))
     if not notify_function:
         print(f"无推送渠道，请检查通知变量是否正确")
     return notify_function
 
 
 def send(title: str, content: str, ignore_default_config: bool = False, **kwargs):
-    if kwargs:
-        global push_config
-        if ignore_default_config:
-            push_config = kwargs  # 清空从环境变量获取的配置
-        else:
-            push_config.update(kwargs)
+    effective_config = push_config.copy()
+    if ignore_default_config:
+        effective_config = kwargs
+    else:
+        effective_config.update(kwargs)
 
     if not content:
         print(f"{title} 推送内容为空！")
@@ -1198,12 +1223,14 @@ def send(title: str, content: str, ignore_default_config: bool = False, **kwargs
             print(f"{title} 在SKIP_PUSH_TITLE环境变量内，跳过推送！")
             return
 
-    hitokoto = push_config.get("HITOKOTO")
+    hitokoto = effective_config.get("HITOKOTO")
     content += "\n\n" + one() if hitokoto != "false" else ""
 
-    notify_function = add_notify_function()
+    notify_function = add_notify_function(effective_config)
+    # partial objects have a 'func' attribute that points to the original function
+    # and the original function has __name__
     ts = [
-        threading.Thread(target=mode, args=(title, content), name=mode.__name__)
+        threading.Thread(target=mode, args=(title, content), name=mode.func.__name__)
         for mode in notify_function
     ]
     [t.start() for t in ts]

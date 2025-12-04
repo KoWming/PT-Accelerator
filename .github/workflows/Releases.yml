@@ -2,8 +2,7 @@ name: Build and Publish Docker Image (Docker Hub)
 
 on:
   push:
-    branches: [ main ]
-    tags: [ 'v*.*.*' ]
+    branches: [ latest-dev ]
   workflow_dispatch:
     inputs:
       version:
@@ -35,38 +34,13 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Extract version from version.py
-        id: version
-        run: |
-          VERSION=$(python3 -c "import sys; sys.path.insert(0, '.'); from version import __version__; print(__version__)")
-          echo "version_with_v=v$VERSION" >> $GITHUB_OUTPUT
-          echo "Extracted version: $VERSION"
-
-      - name: Extract metadata (tags, labels)
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: |
-            docker.io/${{ secrets.DOCKER_USERNAME }}/pt-accelerator
-          tags: |
-            # Git tag 标签（如 v2.0.4）
-            type=ref,event=tag
-            # latest 标签（仅在默认分支时）
-            type=raw,value=latest,enable={{is_default_branch}}
-            # 带 v 前缀的程序版本号标签（如 v2.0.4）
-            type=raw,value=${{ steps.version.outputs.version_with_v }},enable=${{ steps.version.outputs.version_with_v != '' }}
-            # 手动输入的自定义版本号标签
-            type=raw,value=${{ github.event.inputs.version }},enable=${{ github.event.inputs.version != '' }}
-
-      - name: Build and push (multi-arch)
+      - name: Build and push Dev (multi-arch)
         uses: docker/build-push-action@v5
         with:
           context: .
           file: ./Dockerfile
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: |
-            ${{ steps.meta.outputs.tags }}
-            docker.io/${{ secrets.DOCKER_USERNAME }}/pt-accelerator:arm64
-          labels: ${{ steps.meta.outputs.labels }}
+          target: with-frontend
+          tags: docker.io/${{ secrets.DOCKER_USERNAME }}/pt-accelerator:latest-dev
 
