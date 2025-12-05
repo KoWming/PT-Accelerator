@@ -12,6 +12,7 @@ export interface TorrentClient {
     use_https: boolean;
     path?: string;
     enable: boolean;
+    version?: string;
 }
 
 export interface ClientType {
