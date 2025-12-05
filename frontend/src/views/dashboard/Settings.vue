@@ -229,6 +229,61 @@
                 @close="closeModal" 
                 @save="saveChannel" 
               />
+
+              <!-- Notification Channel Description -->
+              <div class="mt-5 pt-4 border-top border-secondary border-opacity-10">
+                <h6 class="fw-bold mb-3 text-secondary"><i class="bi bi-info-circle me-2"></i>通知渠道说明</h6>
+                <div class="row g-3">
+                  <div class="col-md-6">
+                    <div class="p-3 bg-dark-glass rounded-3 border border-secondary border-opacity-10 h-100">
+                      <div class="d-flex mb-2">
+                        <span class="badge bg-success bg-opacity-10 text-success me-2">企业微信机器人</span>
+                      </div>
+                      <p class="small text-muted mb-0">适合企业微信群通知，配置机器人 Key 即可。</p>
+                    </div>
+                  </div>
+                  <div class="col-md-6">
+                    <div class="p-3 bg-dark-glass rounded-3 border border-secondary border-opacity-10 h-100">
+                      <div class="d-flex mb-2">
+                        <span class="badge bg-success bg-opacity-10 text-success me-2">企业微信App</span>
+                      </div>
+                      <p class="small text-muted mb-0">通过企业自建应用推送，需 corpid/corpsecret/touser/agentid，可选 media_id。</p>
+                    </div>
+                  </div>
+                  <div class="col-md-6">
+                    <div class="p-3 bg-dark-glass rounded-3 border border-secondary border-opacity-10 h-100">
+                      <div class="d-flex mb-2">
+                        <span class="badge bg-primary bg-opacity-10 text-primary me-2">Telegram</span>
+                      </div>
+                      <p class="small text-muted mb-0">使用 Bot Token 与用户ID，支持可选代理。</p>
+                    </div>
+                  </div>
+                  <div class="col-md-6">
+                    <div class="p-3 bg-dark-glass rounded-3 border border-secondary border-opacity-10 h-100">
+                      <div class="d-flex mb-2">
+                        <span class="badge bg-warning bg-opacity-10 text-warning me-2">邮件 (SMTP)</span>
+                      </div>
+                      <p class="small text-muted mb-0">配置服务器、邮箱与密码，支持 SSL 与端口。</p>
+                    </div>
+                  </div>
+                  <div class="col-md-6">
+                    <div class="p-3 bg-dark-glass rounded-3 border border-secondary border-opacity-10 h-100">
+                      <div class="d-flex mb-2">
+                        <span class="badge bg-info bg-opacity-10 text-info me-2">iGot / Server酱 / 飞书 / 钉钉</span>
+                      </div>
+                      <p class="small text-muted mb-0">常用聚合与办公通知渠道，分别填写对应的 Key 或 Token 即可。</p>
+                    </div>
+                  </div>
+                  <div class="col-md-6">
+                    <div class="p-3 bg-dark-glass rounded-3 border border-secondary border-opacity-10 h-100">
+                      <div class="d-flex mb-2">
+                        <span class="badge bg-secondary bg-opacity-10 text-secondary me-2">自定义 Webhook</span>
+                      </div>
+                      <p class="small text-muted mb-0">支持 POST/GET，自定义 Header 与 Body（含占位符 $title/$content）。</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
