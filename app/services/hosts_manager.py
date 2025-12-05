@@ -631,6 +631,7 @@ class HostsManager:
                     script_path = "cfst_linux_arm64/cfst_hosts.sh"
                 else:
                     script_path = "cfst_linux_amd64/cfst_hosts.sh"
+            task_start_time = time.time()
             logger.info("开始执行严格串行的优选IP+更新tracker+更新hosts流程")
             best_ip = None
             old_ip = None
@@ -746,33 +747,38 @@ class HostsManager:
                         continue
                     domain_ip_candidates.setdefault(domain, set()).add(ip)
                     current_domains.add(domain)
+            domain_ip_latency = {}
+            log_lines = []
+            merged_dict = {}
+            
             lost_domains = backup_domains - current_domains
             for lost_domain in lost_domains:
                 lost_ip = merged_hosts_backup[lost_domain]
                 if self._dns_check(lost_domain, lost_ip):
                     domain_ip_candidates.setdefault(lost_domain, set()).add(lost_ip)
-                    logger.warning(f"[兜底保留] 域名 {lost_domain} 本次未被任何源收录，但DNS检测有效，保留上次IP: {lost_ip}")
+                    msg = f"[兜底保留] 域名 {lost_domain} 本次未被任何源收录，但DNS检测有效，保留上次IP: {lost_ip}"
+                    logger.warning(msg)
+                    log_lines.append(msg)
                 else:
-                    logger.warning(f"[兜底丢弃] 域名 {lost_domain} 本次未被任何源收录，且DNS检测无效，丢弃上次IP: {lost_ip}")
-            domain_ip_latency = {}
-            log_lines = []
-            merged_dict = {}
+                    msg = f"[兜底丢弃] 域名 {lost_domain} 本次未被任何源收录，且DNS检测无效，丢弃上次IP: {lost_ip}"
+                    logger.warning(msg)
+                    log_lines.append(msg)
             for domain, ip_set in domain_ip_candidates.items():
                 if is_blacklisted(domain):
                     continue
-                best_ip = None
-                best_latency = None
+                domain_best_ip = None
+                domain_best_latency = None
                 ip_results = []
                 for ip in ip_set:
                     latency = self._ping_ip(ip, cache=ip_latency_cache, domain=domain)
                     ip_results.append((ip, latency))
-                    if latency is not None and (best_latency is None or latency < best_latency):
-                        best_ip = ip
-                        best_latency = latency
-                if best_ip:
-                    domain_ip_latency[domain] = (best_ip, best_latency)
-                    merged_dict[domain] = best_ip
-                    log_lines.append(f"域名 {domain} 选用IP: {best_ip}，延迟: {best_latency:.2f} ms")
+                    if latency is not None and (domain_best_latency is None or latency < domain_best_latency):
+                        domain_best_ip = ip
+                        domain_best_latency = latency
+                if domain_best_ip:
+                    domain_ip_latency[domain] = (domain_best_ip, domain_best_latency)
+                    merged_dict[domain] = domain_best_ip
+                    log_lines.append(f"域名 {domain} 选用IP: {domain_best_ip}，延迟: {domain_best_latency:.2f} ms")
                 else:
                     ip = next(iter(ip_set))
                     domain_ip_latency[domain] = (ip, 999.0)
@@ -798,35 +804,42 @@ class HostsManager:
                 logger.info(line)
             self._save_merged_hosts_backup(merged_dict)
             # 构建详细的通知消息
-            msg_lines = ["✅ Cloudflare优选完成！"]
+            msg_lines = ["Cloudflare优选完成！"]
             # 这里假设 old_ip 可以从某处获取，或者如果无法获取就省略
-            # 目前代码中没有显式记录 old_ip，暂且只显示新IP
-            # 如果需要显示旧IP，需要在更新前记录 best_cloudflare_ip
-            msg_lines.append(f"旧 IP 为：{old_ip}") 
-            msg_lines.append(f"新 IP 为：{best_ip}")
+            if old_ip:
+                msg_lines.append(f"旧 IP 为：{old_ip}") 
             
-            # 尝试获取测速耗时，这里简单用 total_time 或者从脚本输出解析
-            # 由于脚本输出解析较复杂，这里暂时用总耗时代替，或者省略
-            msg_lines.append(f"测速耗时：{latency}ms")
+            # 使用脚本输出的最优IP
+            final_best_ip = best_ip if best_ip else self.best_cloudflare_ip
+            msg_lines.append(f"新 IP 为：{final_best_ip}")
+            
+            # 计算总耗时
+            total_duration = time.time() - task_start_time
+            msg_lines.append(f"测速耗时：{total_duration:.2f} 秒")
 
             tracker_count = len(filtered_trackers) if isinstance(filtered_trackers, list) else 0
             msg_lines.append(f"已更新： {tracker_count} 个Tracker和 {total_entries} 条hosts记录")
             
             if log_lines:
-                msg_lines.append("兜底保留：")
                 # 筛选出兜底相关的日志
                 fallback_logs = [line for line in log_lines if "兜底" in line]
-                for log in fallback_logs:
-                     # 格式化日志输出，使其更接近用户要求的格式
-                     # 例如: "域名 domain 选用IP: ip，延迟: ms" -> "域名：domain\n保留上次IP：ip"
-                     # 这里做简单的文本转换
-                     if "保留上次IP" in log:
-                         parts = log.split("保留上次IP:")
-                         if len(parts) > 1:
-                             domain_part = parts[0].split("域名")[1].split("本次")[0].strip()
-                             ip_part = parts[1].strip()
-                             msg_lines.append(f"域名：{domain_part}")
-                             msg_lines.append(f"保留上次IP：{ip_part}")
+                if fallback_logs:
+                    msg_lines.append("兜底详情：")
+                    for log in fallback_logs:
+                         # 格式化日志输出
+                         if "保留上次IP" in log:
+                             parts = log.split("保留上次IP:")
+                             if len(parts) > 1:
+                                 domain_part = parts[0].split("域名")[1].split("本次")[0].strip()
+                                 ip_part = parts[1].strip()
+                                 msg_lines.append(f"✅ 保留：{domain_part}")
+                                 msg_lines.append(f"   IP：{ip_part}")
+                         elif "丢弃上次IP" in log:
+                             parts = log.split("丢弃上次IP:")
+                             if len(parts) > 1:
+                                 domain_part = parts[0].split("域名")[1].split("本次")[0].strip()
+                                 ip_part = parts[1].strip()
+                                 msg_lines.append(f"❌ 丢弃：{domain_part}")
 
             final_message = "\n".join(msg_lines)
             self.task_status = {"status": "done", "message": final_message}
