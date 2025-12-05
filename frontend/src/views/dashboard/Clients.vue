@@ -37,6 +37,7 @@
             <span class="fw-bold">{{ client.name }}</span>
             <div class="d-flex align-items-center gap-2">
               <span class="badge" :class="getTypeBadgeClass(client.type)">{{ getTypeNameShort(client.type) }}</span>
+              <span v-if="client.version" class="badge" :class="getTypeBadgeClass(client.type)">{{ client.version }}</span>
               <span class="badge" :class="client.enable ? 'badge-enabled' : 'badge-disabled'">
                 {{ client.enable ? '已启用' : '已禁用' }}
               </span>
@@ -250,6 +251,17 @@ const handleSaveClient = async () => {
   
   saving.value = true;
   try {
+    // 尝试获取版本信息
+    try {
+      const testRes = await store.testConnectionConfig({ ...form });
+      if (testRes.success && testRes.version) {
+        form.version = testRes.version;
+      }
+    } catch (e) {
+      // 测试失败不阻止保存，只是没有版本号
+      console.warn('保存前测试连接失败', e);
+    }
+
     const clients = [...store.clients];
     if (isEdit.value) {
       const index = clients.findIndex(c => c.id === form.id);
@@ -288,6 +300,12 @@ const testConnection = async (id: string) => {
     const res = await store.testConnection(id);
     if (res.success) {
       toast.success(res.message);
+      if (res.version) {
+        const client = store.clients.find(c => c.id === id);
+        if (client) {
+          client.version = res.version;
+        }
+      }
     } else {
       toast.error(res.message);
     }
