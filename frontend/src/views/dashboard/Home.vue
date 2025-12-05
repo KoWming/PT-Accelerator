@@ -128,14 +128,14 @@
                 </div>
                 
                 <div class="col-md-6">
-                  <div v-if="!showCronEditor" class="alert alert-info border-0 bg-info bg-opacity-10 text-info h-100 mb-0">
+                  <div v-if="!showCronEditor" class="alert alert-info border-0 bg-info bg-opacity-10 h-100 mb-0" style="color: #16b1ff">
                     <div class="d-flex align-items-center gap-2 mb-2">
                       <i class="bi bi-info-circle-fill"></i>
                       <h6 class="fw-bold mb-0">CRON表达式说明:</h6>
                     </div>
                     <div class="ps-4">
-                      <p class="mb-1 font-monospace" style="color: inherit">分 时 日 月 周</p>
-                      <ul class="list-unstyled mb-0 font-monospace small" style="color: inherit">
+                      <p class="mb-1 font-monospace" style="color: #16b1ff">分 时 日 月 周</p>
+                      <ul class="list-unstyled mb-0 font-monospace small" style="color: #16b1ff">
                         <li>0 0 * * * = 每天 00:00 执行</li>
                         <li>0 */6 * * * = 每6小时执行一次</li>
                         <li>0 0 * * 0 = 每周日 00:00 执行</li>
