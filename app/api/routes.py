@@ -10,6 +10,8 @@ from croniter import croniter
 from urllib.parse import urlparse
 import time
 import copy
+import secrets
+import string
 
 from app.services.cloudflare_speed_test import CloudflareSpeedTestService
 from app.services.hosts_manager import HostsManager
@@ -214,7 +216,7 @@ async def get_auth_status(current_user: Optional[User] = Depends(get_current_use
     if not auth_enable:
         return {
             "is_authenticated": True,
-            "user": {"username": "admin", "is_authenticated": True},
+            "user": {"username": "guest", "is_authenticated": True},
             "auth_enabled": False
         }
     
@@ -249,6 +251,20 @@ async def update_auth_config(
         auth_settings["enable"] = enable_auth
         config_changed = True
         logger.info(f"登录认证已 {'启用' if enable_auth else '禁用'}")
+
+        # 如果启用认证且没有设置密码，也没有提供新密码，则生成随机密码
+        if enable_auth and not auth_settings.get("password_hash") and not new_password:
+            alphabet = string.ascii_letters + string.digits
+            generated_password = ''.join(secrets.choice(alphabet) for i in range(12))
+            auth_settings["password_hash"] = get_password_hash(generated_password)
+            
+            # 确保设置默认用户名（如果不存在且未在本次请求中提供）
+            if not auth_settings.get("username") and not username:
+                auth_settings["username"] = "admin"
+                logger.info("未设置用户名，已默认设置为: admin")
+            
+            logger.info(f"已自动生成随机初始密码: {generated_password}")
+            logger.warning("请务必保存此密码！它只会在日志中显示一次。")
 
     if username and username != auth_settings.get("username"):
         auth_settings["username"] = username
