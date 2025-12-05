@@ -4,9 +4,7 @@ import os
 import platform
 import requests
 import subprocess
-import threading
-from typing import Dict, List, Any, Optional, Tuple
-from python_hosts import Hosts, HostsEntry
+from typing import Dict, List, Any, Tuple
 import time
 import hashlib
 import yaml
@@ -14,7 +12,6 @@ import re
 import socket
 import urllib3
 import json
-
 
 logger = logging.getLogger(__name__)
 
@@ -148,8 +145,6 @@ class HostsManager:
                 
         return entries
     
-
-    
     def _get_cache_path(self, url: str) -> str:
         """根据url生成本地缓存文件路径"""
         cache_dir = "cache"
@@ -231,7 +226,7 @@ class HostsManager:
             
         # 增加多方式检测（socket连接+ICMP ping），并增加重试机制，避免因临时网络波动导致误判
         ports = [80, 443]
-        last_exception = None
+
         # 优先尝试socket连接
         for retry in range(self.ping_retry_count):
             for port in ports:
@@ -250,7 +245,6 @@ class HostsManager:
                         self.domain_failure_counter[domain] = 0
                     return latency
                 except Exception as e:
-                    last_exception = e
                     continue
             # 如果所有端口都连接失败，等待短暂时间后重试
             if retry < self.ping_retry_count - 1:
@@ -268,7 +262,7 @@ class HostsManager:
                     self.domain_failure_counter[domain] = 0
                 return 999
         except Exception as e:
-            last_exception = e
+            pass
         # 所有重试都失败
         if cache is not None:
             cache[ip] = None
@@ -332,8 +326,6 @@ class HostsManager:
                 all_entries["pt_sites"] = pt_entries
             logger.info(f"收集到 {len(pt_entries)} 条PT站点条目")
 
-
-
             # 3. 订阅源条目
             source_entries_map: Dict[str, List[str]] = {}
             tracker_domains = set()
@@ -386,9 +378,6 @@ class HostsManager:
                 if lost_domain.strip().lower() in disabled_domains:
                     logger.info(f"[兜底跳过] 域名 {lost_domain} 已被用户禁用，不参与兜底保留")
                     continue
-
-
-                
                 lost_ip = merged_hosts_backup[lost_domain]
                 if self._dns_check(lost_domain, lost_ip):
                     source_entries_map.setdefault("LostHosts", []).append(f"{lost_ip}\t{lost_domain}")
@@ -687,7 +676,7 @@ class HostsManager:
                     self.config["trackers"] = filtered_trackers
                     logger.info(f"[IP优选] 过滤了 {original_count - len(filtered_trackers)} 个非Cloudflare站点: {', '.join(non_cf_domains)}")
                 logger.info(f"已将 {len(filtered_trackers)} 个Cloudflare站点Tracker的IP更新为 {best_ip}")
-            config_path = "config/config.yaml"
+
             # 仅合并写 trackers（以及可能的 cloudflare_domains 后续有需要可一并传入）
             self._merge_write_config({"trackers": self.config.get("trackers", [])})
             self.update_config(self.config)
@@ -1147,7 +1136,7 @@ class HostsManager:
             family = socket.AF_INET if '.' in ip else socket.AF_INET6
             
             # 转换IP为网络字节序
-            ip_packed = socket.inet_pton(family, ip)
+
             
             try:
                 import ipaddress
