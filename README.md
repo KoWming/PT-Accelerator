@@ -1,6 +1,6 @@
 # PT-Accelerator v2.0.5
 
-一个面向PT站点用户的全自动加速与管理平台，集成Cloudflare IP优选、PT Tracker批量管理、GitHub/TMDB等站点加速、下载器一键导入、Web可视化配置等多种功能，支持Docker一键部署，适合所有对网络加速和PT站点体验有高要求的用户。
+一个面向PT站点用户的全自动加速与管理平台，采用 **Vue 3 + FastAPI** 前后端分离架构。集成Cloudflare IP优选、PT Tracker批量管理、GitHub/TMDB等站点加速、下载器一键导入、Web可视化配置等多种功能，支持Docker一键部署，适合所有对网络加速和PT站点体验有高要求的用户。
 
 ---
 
@@ -11,7 +11,7 @@
 - **PT Tracker批量管理**：支持批量添加、批量清空、批量导入、单个删除、状态切换等操作，Tracker管理极致高效。
 - **下载器一键导入**：支持qBittorrent、Transmission等主流下载器，自动导入Tracker列表并智能筛选Cloudflare站点。
 - **Hosts源多路合并**：内置多条GitHub/TMDB等Hosts源，自动合并、去重、优选，提升全局访问体验。
-- **Web可视化配置**：所有操作均可在现代化Web界面完成，支持定时任务、白名单、日志、配置等全方位管理。
+- **Web可视化配置**：基于 **Vue 3** 构建的现代化响应式界面，支持定时任务、白名单、日志、配置等全方位管理。
 - **用户登录认证**：内置用户登录与鉴权机制，保障平台访问安全。
 - **多下载器实例支持**：支持同时连接和管理多个qBittorrent及Transmission下载器实例，集中控制更便捷。
 - **一键清空/重建**：支持一键清空所有Tracker、清空并重建hosts文件，彻底解决历史污染和遗留问题。
@@ -29,9 +29,9 @@
 
 ## 快速开始
 
-### 1. Docker一键部署
+### 1. Docker一键部署（推荐）
 
-推荐使用Docker，简单高效，支持多架构：
+Docker镜像已包含构建好的前端资源，开箱即用。
 
 ```bash
 # 自动选择架构（推荐）
@@ -81,19 +81,57 @@ docker-compose up -d
 
 ### 2. 本地运行（开发/调试）
 
+本项目采用前后端分离架构，本地运行需要分别构建前端和启动后端。
+
+**前置要求**：
+- Node.js 20+
+- Python 3.11+
+
+#### 步骤一：构建前端 (Vue 3)
+
 ```bash
-# 克隆仓库
-git clone https://github.com/eternalcurse/PT-Accelerator.git
-cd PT-Accelerator
+# 进入前端目录
+cd frontend
 
 # 安装依赖
+npm install
+
+# 构建生产环境资源 (生成 dist 目录)
+npm run build
+
+# 返回项目根目录
+cd ..
+```
+
+#### 步骤二：启动后端 (FastAPI)
+
+后端会自动挂载前端构建生成的 `frontend/dist` 目录。
+
+```bash
+# 安装后端依赖
 pip install -r requirements.txt
 
 # 启动服务
 bash start.sh
-# 或
-python -m uvicorn app.main:app --host 0.0.0.0 --port ${APP_PORT:-23333}
+# 或手动运行
+# python -m uvicorn app.main:app --host 0.0.0.0 --port ${APP_PORT:-23333}
 ```
+
+#### 开发模式 (热重载)
+
+如果你需要修改前端代码，建议同时开启前后端开发服务器：
+
+1.  **启动后端**：
+    ```bash
+    python -m uvicorn app.main:app --host 0.0.0.0 --port 23333 --reload
+    ```
+2.  **启动前端 (Vite)**：
+    ```bash
+    cd frontend
+    npm run dev
+    ```
+    访问 Vite 提供的开发地址 (通常是 `http://localhost:5173`) 进行调试。
+
 ---
 
 ## Web界面入口
@@ -160,6 +198,21 @@ python -m uvicorn app.main:app --host 0.0.0.0 --port ${APP_PORT:-23333}
 - 支持多种通知渠道，及时获取系统状态
 - 任务完成通知、错误告警通知
 - 可选配置通知方式
+- **支持渠道**：
+  - Telegram Bot
+  - 企业微信 (应用/Bot)
+  - SMTP 邮件
+  - Bark (iOS)
+  - WxPusher
+  - Gotify
+  - MediaSaber
+  - Webhook
+
+### 8. 备份与恢复
+- **WebDAV支持**：支持将配置文件自动备份到WebDAV服务器（如坚果云、Nextcloud等）。
+- **定时备份**：每次修改配置或定时任务触发时自动备份。
+- **一键恢复**：支持从云端备份列表选择并一键恢复配置，防止数据丢失。
+- **版本控制**：支持设置保留备份数量，自动清理旧备份。
 
 ---
 
@@ -203,6 +256,7 @@ python -m uvicorn app.main:app --host 0.0.0.0 --port ${APP_PORT:-23333}
         username: admin
         password: adminadmin
         use_https: false
+        version: 
         enable: true
       - name: Transmission备用
         type: transmission
@@ -211,6 +265,7 @@ python -m uvicorn app.main:app --host 0.0.0.0 --port ${APP_PORT:-23333}
         username: 
         password: 
         use_https: false
+        version: 
         enable: true
     ```
 
@@ -219,6 +274,30 @@ python -m uvicorn app.main:app --host 0.0.0.0 --port ${APP_PORT:-23333}
   - `domain`：Tracker域名
   - `ip`：优选的IP地址
   - `enable`：是否启用
+  
+- `backup`：备份配置 (新增)
+  - `enable`：是否启用自动备份
+  - `webdav_url`：WebDAV服务器地址 (例如 `https://dav.jianguoyun.com/dav/backup/`)
+  - `webdav_username`：WebDAV用户名
+  - `webdav_password`：WebDAV密码/应用密码
+  - `backup_count`：保留备份文件数量 (默认5)
+
+- `notify`：通知配置
+  - `channels`：多通道配置列表 (支持 Telegram, WeCom, SMTP, Bark, WxPusher, Gotify, MediaSaber, Webhook)
+  - 示例：
+    ```yaml
+    notify:
+      channels:
+        my_telegram:
+          type: telegram
+          enable: true
+          TG_BOT_TOKEN: "123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11"
+          TG_USER_ID: "123456789"
+        my_bark:
+          type: bark
+          enable: true
+          BARK_PUSH: "https://api.day.app/your_key/"
+    ```
 
 **所有配置均可通过Web界面实时修改，无需手动编辑。**
 
@@ -256,13 +335,13 @@ python -m uvicorn app.main:app --host 0.0.0.0 --port ${APP_PORT:-23333}
   A: 会影响。建议在测速时临时关闭系统代理，确保获得准确的测速结果。
 
 - **Q: 项目如何更新？**  
-  A: 使用Docker部署的用户可以通过`docker pull eternalcurse/pt-accelerator:latest`拉取最新镜像，再重新创建容器。
+  A: 使用Docker部署的用户可以通过`docker pull kowming/pt-accelerator:latest`拉取最新镜像，再重新创建容器。
 
 - **Q: 支持哪些架构？**  
   A: 支持AMD64和ARM64架构，包括x86_64服务器、树莓派、ARM服务器等。Docker会自动选择对应架构的镜像。
 
 - **Q: 如何在树莓派上运行？**  
-  A: 树莓派使用ARM64架构，直接使用`docker pull eternalcurse/pt-accelerator:latest`即可，Docker会自动选择ARM64版本。
+  A: 树莓派使用ARM64架构，直接使用`docker pull kowming/pt-accelerator:latest`即可，Docker会自动选择ARM64版本。
 
 - **Q: 如何手动构建特定版本的镜像？**  
   A: 在GitHub Actions页面可以手动触发构建，并自定义版本号（如v1.0.0-hotfix），支持紧急修复版本发布。
@@ -295,13 +374,25 @@ python -m uvicorn app.main:app --host 0.0.0.0 --port ${APP_PORT:-23333}
 
 ---
 
-## 依赖与环境
+## 技术栈
 
-- Python 3.9+
-- FastAPI、Uvicorn、APScheduler、requests、jinja2
-- python-hosts、transmission-rpc、dnspython等（详见requirements.txt）
-- cfst（已内置二进制，支持Linux AMD64/ARM64平台）
-- Docker（支持多架构构建和部署）
+### 前端 (Frontend)
+- **核心框架**: Vue 3, Vite
+- **语言**: TypeScript
+- **UI框架**: Bootstrap 5
+- **状态管理**: Pinia
+- **样式预处理**: Sass
+
+### 后端 (Backend)
+- **核心框架**: FastAPI (Python 3.11+)
+- **服务器**: Uvicorn
+- **任务调度**: APScheduler
+- **依赖库**: python-hosts, transmission-rpc, dnspython, passlib, croniter, aiohttp
+
+### 部署与运维 (DevOps)
+- **容器化**: Docker (支持 AMD64/ARM64 多架构)
+- **CI/CD**: GitHub Actions
+- **核心组件**: CloudflareSpeedTest (内置)
 
 ---
 
@@ -333,8 +424,8 @@ python -m uvicorn app.main:app --host 0.0.0.0 --port ${APP_PORT:-23333}
 
 - **v2.0.5** (2025-11-17) - 修复企业微信App加载渠道配置编辑失败问题，新增转发代理配置
 - **v2.0.4** (2025-11-16) - 修复定时任务跳过执行问题、修复多通知渠道重复发送问题
-- **v2.0.3** (2025-10-12) - 修复通知渠道关闭状态问题
-- **v2.0.2** (2025-10-11) - 添加Media Saber通知渠道
+- **v2.0.3** (2025-10-12) - 添加Media Saber通知渠道
+- **v2.0.2** (2025-10-11) - 修复自定义通知配置问题
 - **v2.0.1** (2025-10-11) - 修复自定义通知配置问题
 - **v2.0.0** (2025-09-25) - 架构自适应支持、多通知渠道、移动端适配、Hosts结构保护
 - **v1.0.0** (2025-04-29) - 初始版本发布
@@ -355,4 +446,4 @@ MIT License
 
 ---
 
-如有问题、建议或需求，欢迎在GitHub Issue区反馈！ 
+如有问题、建议或需求，欢迎在GitHub Issue区反馈！
