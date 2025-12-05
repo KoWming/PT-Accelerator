@@ -102,7 +102,11 @@ const gliderStyle = ref({
 const navListRef = ref<HTMLElement | null>(null);
 
 const username = computed(() => {
-  return authStore.user?.username || 'Guest';
+  const name = authStore.user?.username || 'Guest';
+  if (name.toLowerCase() === 'guest') {
+    return 'guest';
+  }
+  return name;
 });
 
 const userInitial = computed(() => {
