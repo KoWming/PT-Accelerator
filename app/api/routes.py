@@ -338,7 +338,9 @@ async def run_cloudflare_test(
             ok = hosts_manager.run_cfst_and_update_hosts()
             status = hosts_manager.get_task_status() if hasattr(hosts_manager, 'get_task_status') else {}
             msg = status.get('message') if isinstance(status, dict) else ("执行完成" if ok else "执行失败")
-            logger.info(f"[任务通知] IP优选与Hosts更新 -> {msg}")
+            # 仅记录第一行日志，避免刷屏
+            log_msg = msg.split('\n')[0] if msg else ""
+            logger.info(f"[任务通知] IP优选与Hosts更新 -> {log_msg}")
             _send_task_notify("IP优选与Hosts更新", msg)
         # 在后台运行，避免阻塞API响应
         background_tasks.add_task(combined_task)
@@ -682,7 +684,9 @@ async def update_hosts(
             ok = hosts_manager.update_hosts()
             status = hosts_manager.get_task_status() if hasattr(hosts_manager, 'get_task_status') else {}
             msg = status.get('message') if isinstance(status, dict) else ("更新完成" if ok else "更新失败")
-            logger.info(f"[任务通知] 仅更新Hosts -> {msg}")
+            # 仅记录第一行日志，避免刷屏
+            log_msg = msg.split('\n')[0] if msg else ""
+            logger.info(f"[任务通知] 仅更新Hosts -> {log_msg}")
             _send_task_notify("仅更新Hosts", msg)
         background_tasks.add_task(task)
         return {"message": "hosts更新任务已启动"}
