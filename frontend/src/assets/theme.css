@@ -4069,3 +4069,19 @@ body.light-theme .alert-info {
   margin-left: auto !important;
   outline: none !important;
 }
+
+/* Downloader Badges */
+.badge-qb {
+  background-color: #38bdf8;
+  color: #fff;
+}
+
+.badge-tr {
+  background-color: #fb7185;
+  color: #fff;
+}
+
+/* Form Text Override for Dark Mode */
+.form-text {
+  color: var(--text-muted) !important;
+}
