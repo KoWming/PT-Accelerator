@@ -273,7 +273,7 @@ def feishu_bot(title: str, content: str, config=None) -> None:
 
     url = f'https://open.feishu.cn/open-apis/bot/v2/hook/{cfg.get("FSKEY")}'
     data = {"msg_type": "text", "content": {"text": f"{title}\n\n{content}"}}
-    response = requests.post(url, data=json.dumps(data)).json()
+    response = requests.post(url, data=json.dumps(data), timeout=15).json()
 
     if response.get("StatusCode") == 0 or response.get("code") == 0:
         print("飞书 推送成功！")
@@ -292,7 +292,7 @@ def go_cqhttp(title: str, content: str, config=None) -> None:
     print("go-cqhttp 服务启动")
 
     url = f'{cfg.get("GOBOT_URL")}?access_token={cfg.get("GOBOT_TOKEN")}&{cfg.get("GOBOT_QQ")}&message=标题:{title}\n内容:{content}'
-    response = requests.get(url).json()
+    response = requests.get(url, timeout=15).json()
 
     if response["status"] == "ok":
         print("go-cqhttp 推送成功！")
@@ -316,7 +316,7 @@ def gotify(title: str, content: str, config=None) -> None:
         "message": content,
         "priority": cfg.get("GOTIFY_PRIORITY"),
     }
-    response = requests.post(url, data=data).json()
+    response = requests.post(url, data=data, timeout=15).json()
 
     if response.get("id"):
         print("gotify 推送成功！")
@@ -337,7 +337,7 @@ def iGot(title: str, content: str, config=None) -> None:
     url = f'https://push.hellyw.com/{cfg.get("IGOT_PUSH_KEY")}'
     data = {"title": title, "content": content}
     headers = {"Content-Type": "application/x-www-form-urlencoded"}
-    response = requests.post(url, data=data, headers=headers).json()
+    response = requests.post(url, data=data, headers=headers, timeout=15).json()
 
     if response["ret"] == 0:
         print("iGot 推送成功！")
@@ -364,7 +364,7 @@ def serverJ(title: str, content: str, config=None) -> None:
     else:
         url = f'https://sctapi.ftqq.com/{cfg.get("PUSH_KEY")}.send'
 
-    response = requests.post(url, data=data).json()
+    response = requests.post(url, data=data, timeout=15).json()
 
     if response.get("errno") == 0 or response.get("code") == 0:
         print("serverJ 推送成功！")
@@ -391,7 +391,7 @@ def pushdeer(title: str, content: str, config=None) -> None:
     if cfg.get("DEER_URL"):
         url = cfg.get("DEER_URL")
 
-    response = requests.post(url, data=data).json()
+    response = requests.post(url, data=data, timeout=15).json()
 
     if len(response.get("content").get("result")) > 0:
         print("PushDeer 推送成功！")
@@ -410,7 +410,7 @@ def chat(title: str, content: str, config=None) -> None:
     print("chat 服务启动")
     data = "payload=" + json.dumps({"text": title + "\n" + content})
     url = cfg.get("CHAT_URL") + cfg.get("CHAT_TOKEN")
-    response = requests.post(url, data=data)
+    response = requests.post(url, data=data, timeout=15)
 
     if response.status_code == 200:
         print("Chat 推送成功！")
@@ -442,7 +442,7 @@ def pushplus_bot(title: str, content: str, config=None) -> None:
     }
     body = json.dumps(data).encode(encoding="utf-8")
     headers = {"Content-Type": "application/json"}
-    response = requests.post(url=url, data=body, headers=headers).json()
+    response = requests.post(url=url, data=body, headers=headers, timeout=15).json()
 
     code = response["code"]
     if code == 200:
@@ -456,7 +456,7 @@ def pushplus_bot(title: str, content: str, config=None) -> None:
     else:
         url_old = "http://pushplus.hxtrip.com/send"
         headers["Accept"] = "application/json"
-        response = requests.post(url=url_old, data=body, headers=headers).json()
+        response = requests.post(url=url_old, data=body, headers=headers, timeout=15).json()
 
         if response["code"] == 200:
             print("PUSHPLUS(hxtrip) 推送成功！")
@@ -490,7 +490,7 @@ def weplus_bot(title: str, content: str, config=None) -> None:
     }
     body = json.dumps(data).encode(encoding="utf-8")
     headers = {"Content-Type": "application/json"}
-    response = requests.post(url=url, data=body, headers=headers).json()
+    response = requests.post(url=url, data=body, headers=headers, timeout=15).json()
 
     if response["code"] == 200:
         print("微加机器人 推送成功！")
@@ -510,7 +510,7 @@ def qmsg_bot(title: str, content: str, config=None) -> None:
 
     url = f'https://qmsg.zendee.cn/{cfg.get("QMSG_TYPE")}/{cfg.get("QMSG_KEY")}'
     payload = {"msg": f'{title}\n\n{content.replace("----", "-")}'.encode("utf-8")}
-    response = requests.post(url=url, params=payload).json()
+    response = requests.post(url=url, params=payload, timeout=15).json()
 
     if response["code"] == 0:
         print("qmsg 推送成功！")
@@ -570,7 +570,7 @@ class WeCom:
             "corpid": self.CORPID,
             "corpsecret": self.CORPSECRET,
         }
-        req = requests.post(url, params=values)
+        req = requests.post(url, params=values, timeout=15)
         data = json.loads(req.text)
         return data["access_token"]
 
@@ -586,7 +586,7 @@ class WeCom:
             "safe": "0",
         }
         send_msges = bytes(json.dumps(send_values), "utf-8")
-        respone = requests.post(send_url, send_msges)
+        respone = requests.post(send_url, send_msges, timeout=15)
         respone = respone.json()
         return respone["errmsg"]
 
@@ -612,7 +612,7 @@ class WeCom:
             },
         }
         send_msges = bytes(json.dumps(send_values), "utf-8")
-        respone = requests.post(send_url, send_msges)
+        respone = requests.post(send_url, send_msges, timeout=15)
         respone = respone.json()
         return respone["errmsg"]
 
@@ -681,7 +681,7 @@ def telegram_bot(title: str, content: str, config=None) -> None:
         )
         proxies = {"http": proxyStr, "https": proxyStr}
     response = requests.post(
-        url=url, headers=headers, params=payload, proxies=proxies
+        url=url, headers=headers, params=payload, proxies=proxies, timeout=15
     ).json()
 
     if response["ok"]:
@@ -720,7 +720,7 @@ def aibotk(title: str, content: str, config=None) -> None:
         }
     body = json.dumps(data).encode(encoding="utf-8")
     headers = {"Content-Type": "application/json"}
-    response = requests.post(url=url, data=body, headers=headers).json()
+    response = requests.post(url=url, data=body, headers=headers, timeout=15).json()
     print(response)
     if response["code"] == 0:
         print("智能微秘书 推送成功！")
@@ -801,7 +801,7 @@ def pushme(title: str, content: str, config=None) -> None:
         "date": cfg.get("date") if cfg.get("date") else "",
         "type": cfg.get("type") if cfg.get("type") else "",
     }
-    response = requests.post(url, data=data)
+    response = requests.post(url, data=data, timeout=15)
 
     if response.status_code == 200 and response.text == "success":
         print("PushMe 推送成功！")
@@ -846,7 +846,7 @@ def chronocat(title: str, content: str, config=None) -> None:
                     }
                 ],
             }
-            response = requests.post(url, headers=headers, data=json.dumps(data))
+            response = requests.post(url, headers=headers, data=json.dumps(data), timeout=15)
             if response.status_code == 200:
                 if chat_type == 1:
                     print(f"QQ个人消息:{ids}推送成功！")
@@ -888,7 +888,7 @@ def ntfy(title: str, content: str, config=None) -> None:
     headers = {"Title": encoded_title, "Priority": priority}  # 使用编码后的 title
 
     url = cfg.get("NTFY_URL") + "/" + cfg.get("NTFY_TOPIC")
-    response = requests.post(url, data=data, headers=headers)
+    response = requests.post(url, data=data, headers=headers, timeout=15)
     if response.status_code == 200:  # 使用 response.status_code 进行检查
         print("Ntfy 推送成功！")
     else:
@@ -945,7 +945,7 @@ def wxpusher_bot(title: str, content: str, config=None) -> None:
     }
 
     headers = {"Content-Type": "application/json"}
-    response = requests.post(url=url, json=data, headers=headers).json()
+    response = requests.post(url=url, json=data, headers=headers, timeout=15).json()
 
     if response.get("code") == 1000:
         print("wxpusher 推送成功！")
@@ -1120,7 +1120,7 @@ def one() -> str:
     :return:
     """
     url = "https://v1.hitokoto.cn/"
-    res = requests.get(url).json()
+    res = requests.get(url, timeout=5).json()
     return res["hitokoto"] + "    ----" + res["from"]
 
 

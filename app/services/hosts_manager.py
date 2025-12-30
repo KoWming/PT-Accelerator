@@ -253,7 +253,8 @@ class HostsManager:
         try:
             # Windows下ping命令参数不同
             ping_cmd = ["ping", "-n", "1", "-w", str(timeout * 1000), ip] if os.name == "nt" else ["ping", "-c", "1", "-W", str(timeout), ip]
-            result = subprocess.run(ping_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            # 增加对subprocess的超时保护，防止极端情况下卡住
+            result = subprocess.run(ping_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=timeout + 2)
             if result.returncode == 0:
                 if cache is not None:
                     cache[ip] = 999  # ping通但端口不通，延迟设为较高
@@ -626,8 +627,10 @@ class HostsManager:
             old_ip = None
             if os.path.exists(script_path):
                 self.task_status = {"status": "running", "message": "正在运行Cloudflare优选脚本"}
-                result = subprocess.run(["bash", script_path], capture_output=True, text=True)
-                if result.returncode == 0:
+                try:
+                    # 增加超时时间，防止脚本无限挂起（30分钟）
+                    result = subprocess.run(["bash", script_path], capture_output=True, text=True, timeout=1800)
+                    if result.returncode == 0:
                     logger.info(f"脚本执行成功: {result.stdout}")
                     for line in result.stdout.splitlines():
                         if "旧 IP 为" in line:
@@ -646,6 +649,16 @@ class HostsManager:
                                     if part == "最优IP:" or part == "IP:":
                                         best_ip = parts[i+1].strip().rstrip(',')
                                         break
+                except subprocess.TimeoutExpired:
+                    logger.error(f"Cloudflare优选脚本执行超时(30分钟): {script_path}")
+                    self.task_status = {"status": "done", "message": "优选失败: 脚本执行超时"}
+                    self.task_running = False
+                    return False
+                except Exception as e:
+                    logger.error(f"执行Cloudflare优选脚本发生未知错误: {str(e)}")
+                    self.task_status = {"status": "done", "message": f"优选失败: {str(e)}"}
+                    self.task_running = False
+                    return False
             else:
                 logger.error(f"脚本文件不存在: {script_path}")
                 self.task_status = {"status": "done", "message": f"优选失败: 脚本文件不存在: {script_path}"}
@@ -1296,7 +1309,7 @@ class HostsManager:
                 try:
                     import subprocess
                     cmd = ['nslookup', domain]
-                    result = subprocess.run(cmd, capture_output=True, text=True, timeout=3)
+                    result = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
                     for line in result.stdout.splitlines():
                         line = line.strip()
                         # 查找Address行，提取IP地址

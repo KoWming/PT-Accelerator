@@ -14,21 +14,18 @@ cd "$SCRIPT_DIR" || exit 1
 log() { echo "$(date '+%Y-%m-%d %H:%M:%S') - $1"; }
 
 _CHECK() {
-    while true; do
-        if [[ ! -e "nowip_hosts.txt" ]]; then
-            echo -e "该脚本的作用为 CFST 测速后获取最快 IP 并替换 Hosts 中的 Cloudflare CDN IP。\n使用前请先阅读：https://github.com/XIU2/CloudflareSpeedTest/issues/42#issuecomment-768273848"
-            echo -e "第一次使用，请先将 Hosts 中所有 Cloudflare CDN IP 统一改为一个 IP。"
-            read -e -p "输入该 Cloudflare CDN IP 并回车（后续不再需要该步骤）：" NOWIP
-            if [[ -n "${NOWIP}" ]]; then
-                echo ${NOWIP} > nowip_hosts.txt
-                break
-            else
-                echo "该 IP 不能是空！"
-            fi
-        else
-            break
+    if [[ ! -e "nowip_hosts.txt" ]]; then
+        echo -e "该脚本的作用为 CFST 测速后获取最快 IP 并替换 Hosts 中的 Cloudflare CDN IP。\n使用前请先阅读：https://github.com/XIU2/CloudflareSpeedTest/issues/42#issuecomment-768273848"
+        echo -e "第一次使用，请先将 Hosts 中所有 Cloudflare CDN IP 统一改为一个 IP。"
+        # 使用 -t 5 设置5秒超时，避免后台执行时卡死
+        read -t 5 -e -p "输入该 Cloudflare CDN IP 并回车（5秒后自动使用默认值）：" NOWIP
+        
+        if [[ -z "${NOWIP}" ]]; then
+            NOWIP="104.16.91.215"
+            echo -e "\n超时或未输入，自动使用默认 IP: ${NOWIP}"
         fi
-    done
+        echo ${NOWIP} > nowip_hosts.txt
+    fi
 }
 
 _UPDATE() {

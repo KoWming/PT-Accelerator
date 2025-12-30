@@ -109,3 +109,8 @@ config/*.yaml
 *.csv
 .DS_Store
 .idea/
+
+# Temp files
+cache/
+ip.txt
+nowip_hosts.txt
