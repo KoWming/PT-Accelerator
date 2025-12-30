@@ -23,6 +23,7 @@ from app.utils import notify as notify_module
 
 # 从认证模块导入密码处理函数和依赖项
 from app.auth import get_password_hash, verify_password, get_current_user
+from version import get_version
 
 # 配置相关常量
 CONFIG_PATH = "config/config.yaml"
@@ -1556,3 +1557,8 @@ async def test_notify_channel(
     except Exception as e:
         logger.error(f"测试通知失败: {str(e)}")
         raise HTTPException(status_code=500, detail=f"测试通知失败: {str(e)}")
+
+@router.get("/version")
+async def version():
+    """获取当前系统版本号"""
+    return {"version": get_version()}

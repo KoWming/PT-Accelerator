@@ -24,7 +24,7 @@
           <p class="mb-0">
             PT-Accelerator &copy; {{ new Date().getFullYear() }}
             <span class="version-pill">
-              v2.0.5
+              {{ appVersion }}
               <span class="easter-egg-tooltip">
                 妹妹说紫色很有韵味！
                 <i class="star-1">✦</i>
@@ -46,7 +46,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, ref, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useAuthStore } from './stores/auth';
 import Sidebar from './components/layout/Sidebar.vue';
@@ -64,6 +64,23 @@ const logout = async () => {
   await authStore.logout();
   router.push('/login');
 };
+
+const appVersion = ref('');
+
+onMounted(async () => {
+    try {
+        const response = await fetch('/api/version');
+        if (response.ok) {
+            const data = await response.json();
+            appVersion.value = 'v' + data.version;
+        } else {
+            appVersion.value = 'v2.0.7'; // Fallback
+        }
+    } catch (e) {
+        console.error('Failed to fetch version', e);
+        appVersion.value = 'v2.0.7'; // Fallback
+    }
+});
 </script>
 
 <style>
