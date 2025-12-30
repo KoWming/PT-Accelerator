@@ -631,24 +631,24 @@ class HostsManager:
                     # 增加超时时间，防止脚本无限挂起（30分钟）
                     result = subprocess.run(["bash", script_path], capture_output=True, text=True, timeout=1800)
                     if result.returncode == 0:
-                    logger.info(f"脚本执行成功: {result.stdout}")
-                    for line in result.stdout.splitlines():
-                        if "旧 IP 为" in line:
-                            parts = line.split("旧 IP 为")
-                            if len(parts) > 1:
-                                old_ip = parts[1].strip()
-                        if "找到最优IP" in line or "新 IP 为" in line:
-                            if "新 IP 为" in line:
-                                parts = line.split("新 IP 为")
+                        logger.info(f"脚本执行成功: {result.stdout}")
+                        for line in result.stdout.splitlines():
+                            if "旧 IP 为" in line:
+                                parts = line.split("旧 IP 为")
                                 if len(parts) > 1:
-                                    best_ip = parts[1].strip()
-                                    break
-                            else:
-                                parts = line.split()
-                                for i, part in enumerate(parts):
-                                    if part == "最优IP:" or part == "IP:":
-                                        best_ip = parts[i+1].strip().rstrip(',')
+                                    old_ip = parts[1].strip()
+                            if "找到最优IP" in line or "新 IP 为" in line:
+                                if "新 IP 为" in line:
+                                    parts = line.split("新 IP 为")
+                                    if len(parts) > 1:
+                                        best_ip = parts[1].strip()
                                         break
+                                else:
+                                    parts = line.split()
+                                    for i, part in enumerate(parts):
+                                        if part == "最优IP:" or part == "IP:":
+                                            best_ip = parts[i+1].strip().rstrip(',')
+                                            break
                 except subprocess.TimeoutExpired:
                     logger.error(f"Cloudflare优选脚本执行超时(30分钟): {script_path}")
                     self.task_status = {"status": "done", "message": "优选失败: 脚本执行超时"}
