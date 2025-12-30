@@ -658,17 +658,17 @@ class HostsManager:
                     logger.error(f"执行Cloudflare优选脚本发生未知错误: {str(e)}")
                     self.task_status = {"status": "done", "message": f"优选失败: {str(e)}"}
                     self.task_running = False
-                    return False
+                    return False, f"优选失败: {str(e)}"
             else:
                 logger.error(f"脚本文件不存在: {script_path}")
                 self.task_status = {"status": "done", "message": f"优选失败: 脚本文件不存在: {script_path}"}
                 self.task_running = False
-                return False
+                return False, f"优选失败: 脚本文件不存在: {script_path}"
             if not best_ip:
                 logger.error("未能从脚本输出中提取到最优IP，流程中止")
                 self.task_status = {"status": "done", "message": "优选失败: 未能提取到最优IP"}
                 self.task_running = False
-                return False
+                return False, "优选失败: 未能提取到最优IP"
             self.best_cloudflare_ip = best_ip
             logger.info(f"串行流程提取到最优IP: {best_ip}")
             filtered_trackers = []  # 确保后续统计时变量已定义
@@ -805,28 +805,28 @@ class HostsManager:
             for line in log_lines:
                 logger.info(line)
             self._save_merged_hosts_backup(merged_dict)
-            # 构建详细的通知消息
-            msg_lines = ["Cloudflare优选完成！"]
-            # 这里假设 old_ip 可以从某处获取，或者如果无法获取就省略
+            # 构建详细的通知消息（用于推送）
+            notify_msg_lines = ["Cloudflare优选完成！"]
+            
             if old_ip:
-                msg_lines.append(f"旧 IP 为：{old_ip}") 
+                notify_msg_lines.append(f"旧 IP 为：{old_ip}") 
             
             # 使用脚本输出的最优IP
             final_best_ip = best_ip if best_ip else self.best_cloudflare_ip
-            msg_lines.append(f"新 IP 为：{final_best_ip}")
+            notify_msg_lines.append(f"新 IP 为：{final_best_ip}")
             
             # 计算总耗时
             total_duration = time.time() - task_start_time
-            msg_lines.append(f"测速耗时：{total_duration:.2f} 秒")
+            notify_msg_lines.append(f"测速耗时：{total_duration:.2f} 秒")
 
             tracker_count = len(filtered_trackers) if isinstance(filtered_trackers, list) else 0
-            msg_lines.append(f"已更新： {tracker_count} 个Tracker和 {total_entries} 条hosts记录")
+            notify_msg_lines.append(f"已更新： {tracker_count} 个Tracker和 {total_entries} 条hosts记录")
             
             if log_lines:
                 # 筛选出兜底相关的日志
                 fallback_logs = [line for line in log_lines if "兜底" in line]
                 if fallback_logs:
-                    msg_lines.append("兜底详情：")
+                    notify_msg_lines.append("兜底详情：")
                     for log in fallback_logs:
                          # 格式化日志输出
                          if "保留上次IP" in log:
@@ -834,30 +834,32 @@ class HostsManager:
                              if len(parts) > 1:
                                  domain_part = parts[0].split("域名")[1].split("本次")[0].strip()
                                  ip_part = parts[1].strip()
-                                 msg_lines.append(f"✅ 保留：{domain_part}")
-                                 msg_lines.append(f"   IP：{ip_part}")
+                                 notify_msg_lines.append(f"✅ 保留：{domain_part}")
+                                 notify_msg_lines.append(f"   IP：{ip_part}")
                          elif "丢弃上次IP" in log:
                              parts = log.split("丢弃上次IP:")
                              if len(parts) > 1:
                                  domain_part = parts[0].split("域名")[1].split("本次")[0].strip()
                                  ip_part = parts[1].strip()
-                                 msg_lines.append(f"❌ 丢弃：{domain_part}")
+                                 notify_msg_lines.append(f"❌ 丢弃：{domain_part}")
 
-            final_message = "\n".join(msg_lines)
-            self.task_status = {"status": "done", "message": final_message}
+            notify_message = "\n".join(notify_msg_lines)
+            
+            # 前端任务状态只显示简单信息
+            self.task_status = {"status": "done", "message": "Cloudflare优选完成！"}
             self.task_running = False
             logger.info("已完成hosts文件更新")
             if self.pending_update:
                 logger.info("检测到pending_update标记，自动补偿执行一次update_hosts")
                 self.pending_update = False
                 self.update_hosts()
-            return True
+            return True, notify_message
         except Exception as e:
             error_msg = f"严格串行流程执行失败: {str(e)}"
             logger.error(error_msg, exc_info=True)
             self.task_status = {"status": "done", "message": error_msg}
             self.task_running = False
-            return False
+            return False, error_msg
 
     def get_task_status(self):
         """获取当前任务状态"""

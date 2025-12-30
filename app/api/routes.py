@@ -351,13 +351,17 @@ async def run_cloudflare_test(
         # 创建组合任务
         def combined_task():
             logger.info("手动执行组合任务：优选IP + 更新tracker + 更新hosts（严格串行）")
-            ok = hosts_manager.run_cfst_and_update_hosts()
+            ok, notify_msg = hosts_manager.run_cfst_and_update_hosts()
             status = hosts_manager.get_task_status() if hasattr(hosts_manager, 'get_task_status') else {}
-            msg = status.get('message') if isinstance(status, dict) else ("执行完成" if ok else "执行失败")
-            # 仅记录第一行日志，避免刷屏
-            log_msg = msg.split('\n')[0] if msg else ""
+            # status['message'] is now the SHORT message for frontend
+            short_msg = status.get('message') if isinstance(status, dict) else ("执行完成" if ok else "执行失败")
+            
+            # 仅记录第一行日志，避免刷屏 - 记录简短消息
+            log_msg = short_msg.split('\n')[0] if short_msg else ""
             logger.info(f"[任务通知] IP优选与Hosts更新 -> {log_msg}")
-            _send_task_notify("IP优选与Hosts更新", msg)
+            
+            # 发送详细通知
+            _send_task_notify("IP优选与Hosts更新", notify_msg)
         # 在后台运行，避免阻塞API响应
         background_tasks.add_task(combined_task)
         return {"message": "IP优选与Hosts更新任务已启动（严格串行）"}

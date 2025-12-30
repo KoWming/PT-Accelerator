@@ -100,18 +100,21 @@ class SchedulerService:
                     # 更新任务状态
                     self.task_status = {"status": "running", "message": "正在执行定时IP优选任务"}
                     try:
-                        ok = self.hosts_manager.run_cfst_and_update_hosts()
+                        ok, notify_msg = self.hosts_manager.run_cfst_and_update_hosts()
                         status = self.hosts_manager.get_task_status() if hasattr(self.hosts_manager, 'get_task_status') else {}
-                        msg = status.get('message') if isinstance(status, dict) else ("定时IP优选任务完成" if ok else "定时IP优选任务失败")
-                        self.task_status = {"status": "done", "message": msg}
+                        # status['message'] is now the SHORT message
+                        short_msg = status.get('message') if isinstance(status, dict) else ("定时IP优选任务完成" if ok else "定时IP优选任务失败")
+                        
+                        self.task_status = {"status": "done", "message": short_msg}
                         task_duration = time.time() - task_start_time
                         logger.info(f"组合任务完成：优选IP + 更新hosts源（严格串行），耗时 {task_duration:.2f} 秒")
                         
-                        # 发送定时任务完成通知
+                        # 发送定时任务完成通知 (使用详细消息)
                         try:
                             from app.api.routes import _send_task_notify
-                            logger.info(f"[定时任务通知] IP优选与Hosts更新 -> {msg}")
-                            _send_task_notify("IP优选与Hosts更新", msg)
+                            logger.info(f"[定时任务通知] IP优选与Hosts更新 -> {short_msg}")
+                            # 使用返回的详细消息发送pusher通知
+                            _send_task_notify("IP优选与Hosts更新", notify_msg)
                         except Exception as notify_e:
                             logger.error(f"发送定时任务通知失败: {str(notify_e)}")
                     except Exception as e:
