@@ -74,7 +74,7 @@ onMounted(async () => {
             const data = await response.json();
             appVersion.value = 'v' + data.version;
         } else {
-            appVersion.value = 'v2.0.7'; // Fallback
+            appVersion.value = 'v2.0.8'; // Fallback
         }
     } catch (e) {
         console.error('Failed to fetch version', e);

@@ -224,7 +224,7 @@ create_nowip_file()
 config = load_config()
 
 # 创建应用
-app = FastAPI(title="PT-Accelerator")
+app = FastAPI(title="PT-Accelerator", version=get_version())
 
 # 添加 SessionMiddleware, secret_key 从配置中读取
 # 确保在所有路由之前添加中间件

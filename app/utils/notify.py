@@ -1119,9 +1119,37 @@ def one() -> str:
     获取一条一言。
     :return:
     """
-    url = "https://v1.hitokoto.cn/"
-    res = requests.get(url, timeout=5).json()
-    return res["hitokoto"] + "    ----" + res["from"]
+    urls = [
+        "https://v1.hitokoto.cn/",
+        "https://yyapi.xpdbk.com/api/ian",
+        "https://api.nxvav.cn/api/yiyan/",
+    ]
+
+    for url in urls:
+        try:
+            response = requests.get(url, timeout=15)
+            content = ""
+            source = "网络"
+
+            try:
+                res = response.json()
+                if isinstance(res, dict):
+                    content = res.get("hitokoto") or res.get("yiyan") or res.get("text") or res.get("content")
+                    source = res.get("from") or res.get("source") or res.get("nick") or "网络"
+            except Exception:
+                # 解析失败，视为纯文本 (如 yyapi.xpdbk.com)
+                content = response.text.strip()
+            
+            if content:
+                # 移除可能存在的引号
+                if content.startswith('"') and content.endswith('"'):
+                    content = content[1:-1]
+                return f"{content}    ----{source}"
+                
+        except Exception:
+            continue
+            
+    return ""
 
 
 def add_notify_function(config=None):
