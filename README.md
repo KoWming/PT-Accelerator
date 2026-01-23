@@ -32,6 +32,7 @@
 ### 1. Docker一键部署（推荐）
 
 Docker镜像已包含构建好的前端资源，开箱即用。
+建议使用Vue 3构建的版本(旧版本镜像已不再更新)，版本标签为 latest-dev (支持自适应架构X86/arm64)
 
 ```bash
 # 自动选择架构（推荐）
@@ -42,7 +43,7 @@ docker run -d \
   -v /path/to/config:/app/config \
   -v /path/to/logs:/app/logs \
   -e TZ=Asia/Shanghai \
-  kowming/pt-accelerator:latest
+  kowming/pt-accelerator:latest-dev
 
 # 指定架构（ARM64架构）
 docker run -d \
