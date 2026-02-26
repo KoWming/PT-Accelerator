@@ -882,12 +882,12 @@ async def batch_add_domains(
         # 批量添加域名
         for domain in domains:
             # 检查是否已存在
-            if any(t["domain"] == domain for t in config["trackers"]):
+            if any(t["domain"] == domain for t in hosts_manager.config.setdefault("trackers", [])):
                 skipped.append(domain)
                 continue
                 
             # 添加新tracker
-            config["trackers"].append({
+            hosts_manager.config["trackers"].append({
                 "name": domain,
                 "domain": domain,
                 "ip": default_ip,
@@ -897,15 +897,12 @@ async def batch_add_domains(
             
         # 保存配置
         with open(CONFIG_PATH, 'w', encoding='utf-8') as f:
-            yaml.dump(config, f, default_flow_style=False, allow_unicode=True)
+            yaml.dump(hosts_manager.config, f, default_flow_style=False, allow_unicode=True)
             
-        # 更新hosts_manager的配置
-        hosts_manager.update_config(config)
-        
         # 同步更新全局config对象，确保前端API获取到最新数据
         try:
             import app.main
-            app.main.config = config
+            app.main.config = hosts_manager.config
             logger.info("批量添加域名API已同步刷新全局config对象，确保前端获取到最新数据")
         except Exception as e:
             logger.error(f"批量添加域名API刷新全局config对象失败: {str(e)}")

@@ -30,7 +30,9 @@ export const useTrackerStore = defineStore('trackers', {
             this.loading = true;
             try {
                 const response = await axios.get('/config');
-                this.trackers = response.data.trackers || [];
+                const trackersData = response.data.trackers || [];
+                // 确保 Vue3/Pinia 中的数组响应式触发
+                this.trackers.splice(0, this.trackers.length, ...trackersData);
                 this.cloudflare = response.data.cloudflare || {};
             } finally {
                 this.loading = false;
@@ -86,8 +88,12 @@ export const useTrackerStore = defineStore('trackers', {
             this.cloudflare = config;
         },
         async batchAddTrackers(domains: string[]) {
-            await axios.post('/batch-add-domains', { domains });
+            const response = await axios.post('/batch-add-domains', { domains });
+            if (response.data && response.data.status === 'error') {
+                throw new Error(response.data.message || '批量添加失败');
+            }
             await this.fetchConfig();
+            return response.data;
         },
         async updateAllTrackersIp(ip: string) {
             await axios.post(`/update-all-trackers?ip=${ip}`);

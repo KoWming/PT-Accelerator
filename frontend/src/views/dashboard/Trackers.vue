@@ -23,7 +23,7 @@
             <div class="input-group">
               <span class="input-group-text">新IP地址</span>
               <input type="text" class="form-control" v-model="batchIp" placeholder="例如: 1.1.1.1">
-              <button class="btn btn-action-primary" @click="handleBatchUpdateIp" :disabled="batchIpUpdating || !batchIp">
+              <button class="btn btn-action-primary" @click="handleBatchUpdateIp" :disabled="batchIpUpdating || !batchIp || !isValidIpv4">
                 <span v-if="batchIpUpdating" class="spinner-border spinner-border-sm me-1"></span>
                 确认修改
               </button>
@@ -96,15 +96,15 @@
           <table class="table table-hover align-middle">
             <thead>
               <tr>
-                <th>名称</th>
-                <th>域名</th>
-                <th>当前 IP</th>
-                <th class="text-center">状态</th>
+                <th @click="handleSort('name')" style="cursor: pointer;" class="user-select-none">名称 <i :class="getSortIcon('name')"></i></th>
+                <th @click="handleSort('domain')" style="cursor: pointer;" class="user-select-none">域名 <i :class="getSortIcon('domain')"></i></th>
+                <th @click="handleSort('ip')" style="cursor: pointer;" class="user-select-none">当前 IP <i :class="getSortIcon('ip')"></i></th>
+                <th @click="handleSort('enable')" style="cursor: pointer;" class="text-center user-select-none">状态 <i :class="getSortIcon('enable')"></i></th>
                 <th class="text-center" style="white-space: nowrap;">操作</th>
               </tr>
             </thead>
             <tbody>
-              <tr v-for="tracker in store.trackers" :key="tracker.domain">
+              <tr v-for="tracker in sortedTrackers" :key="tracker.domain">
                 <td>{{ tracker.name }}</td>
                 <td>{{ tracker.domain }}</td>
                 <td>{{ tracker.ip || '未设置' }}</td>
@@ -269,7 +269,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, reactive } from 'vue';
+import { ref, onMounted, reactive, computed } from 'vue';
 import { useTrackerStore, type Tracker } from '../../stores/trackers';
 import { useMobile } from '../../composables/useMobile';
 import { useToast } from 'vue-toastification';
@@ -293,6 +293,69 @@ const loadingWhitelist = ref(false);
 const addingWhitelist = ref(false);
 const forceCloudflare = ref(false);
 
+const sortColumn = ref<keyof Tracker | null>(null);
+const sortDirection = ref<'asc' | 'desc'>('asc');
+
+const handleSort = (column: keyof Tracker) => {
+  if (sortColumn.value === column) {
+    // 已经在此列排序，切换方向或取消排序
+    const defaultDir = column === 'enable' ? 'desc' : 'asc';
+    const altDir = column === 'enable' ? 'asc' : 'desc';
+
+    if (sortDirection.value === defaultDir) {
+      sortDirection.value = altDir;
+    } else {
+      sortColumn.value = null; // 第三次点击回到默认不排序
+      sortDirection.value = 'asc';
+    }
+  } else {
+    // 第一次点击该列，'enable' 默认为倒序（开启的在上），其余为正序
+    sortColumn.value = column;
+    sortDirection.value = column === 'enable' ? 'desc' : 'asc';
+  }
+};
+
+const getSortIcon = (column: keyof Tracker) => {
+  if (sortColumn.value !== column) return 'bi bi-arrow-down-up text-muted ms-1 opacity-25';
+  return sortDirection.value === 'asc' ? 'bi bi-sort-down text-primary ms-1' : 'bi bi-sort-up text-primary ms-1';
+};
+
+const sortedTrackers = computed(() => {
+  if (!sortColumn.value) return store.trackers;
+  return [...store.trackers].sort((a, b) => {
+    let valA: any = a[sortColumn.value!];
+    let valB: any = b[sortColumn.value!];
+
+    if (valA === valB) return 0;
+
+    // IP 排序特殊处理（将IP字符串转为可比对的数字）
+    if (sortColumn.value === 'ip') {
+      const ip2num = (ip: string) => {
+        if (!ip) return 0;
+        return ip.split('.').reduce((acc, octet) => (acc << 8) + parseInt(octet, 10), 0) >>> 0;
+      };
+      valA = ip2num(valA as string);
+      valB = ip2num(valB as string);
+      return sortDirection.value === 'asc' ? (valA > valB ? 1 : -1) : (valA > valB ? -1 : 1);
+    }
+
+    if (typeof valA === 'boolean' && typeof valB === 'boolean') {
+      valA = valA ? 1 : 0;
+      valB = valB ? 1 : 0;
+    }
+
+    if (typeof valA === 'string' && typeof valB === 'string') {
+        const compareResult = valA.localeCompare(valB, 'zh-CN', { numeric: true });
+        return sortDirection.value === 'asc' ? compareResult : -compareResult;
+    }
+
+    // fallback compare
+    if (valA < valB) return sortDirection.value === 'asc' ? -1 : 1;
+    if (valA > valB) return sortDirection.value === 'asc' ? 1 : -1;
+    return 0;
+  });
+});
+
 
 const newTracker = reactive<Tracker>({
   name: '',
@@ -309,13 +372,20 @@ onMounted(async () => {
 
 });
 
+const isValidIpv4 = computed(() => {
+  if (!batchIp.value) return false;
+  const ipv4Regex = /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
+  return ipv4Regex.test(batchIp.value.trim());
+});
+
 
 
 const toggleTracker = async (tracker: Tracker) => {
   try {
     await store.updateTracker(tracker.domain, { enable: !tracker.enable });
-  } catch (e) {
-    toast.error('更新失败');
+  } catch (e: any) {
+    const detail = e.response?.data?.detail || e.message || '未知错误';
+    toast.error(`更新失败: ${detail}`);
     // Revert logic handled in store or need to force refresh
     store.fetchConfig();
   }
@@ -336,8 +406,9 @@ const confirmDelete = async (tracker: Tracker) => {
     try {
       await store.deleteTracker(tracker.domain);
       toast.success('删除成功');
-    } catch (e) {
-      toast.error('删除失败');
+    } catch (e: any) {
+      const detail = e.response?.data?.detail || e.message || '未知错误';
+      toast.error(`删除失败: ${detail}`);
     }
   }
 };
@@ -352,8 +423,9 @@ const handleAddTracker = async () => {
     newTracker.enable = true;
     forceCloudflare.value = false;
     toast.success('添加成功');
-  } catch (e) {
-    toast.error('添加失败');
+  } catch (e: any) {
+    const detail = e.response?.data?.detail || e.message || '未知错误';
+    toast.error(`添加失败: ${detail}`);
   } finally {
     adding.value = false;
   }
@@ -364,12 +436,13 @@ const handleBatchAdd = async () => {
   batchAdding.value = true;
   try {
     const domains = batchDomains.value.split('\n').map(d => d.trim()).filter(d => d);
-    await store.batchAddTrackers(domains);
+    const res = await store.batchAddTrackers(domains);
     showBatchModal.value = false;
     batchDomains.value = '';
-    toast.success('批量添加成功');
-  } catch (e) {
-    toast.error('批量添加失败');
+    toast.success(res?.message || '批量添加成功');
+  } catch (e: any) {
+    const detail = e.response?.data?.detail || e.message || '未知错误';
+    toast.error(`批量添加失败: ${detail}`);
   } finally {
     batchAdding.value = false;
   }
@@ -384,8 +457,9 @@ const handleBatchUpdateIp = async () => {
     await store.updateAllTrackersIp(batchIp.value.trim());
     batchIp.value = '';
     toast.success('批量修改成功');
-  } catch (e) {
-    toast.error('批量修改失败');
+  } catch (e: any) {
+    const detail = e.response?.data?.detail || e.message || '未知错误';
+    toast.error(`批量修改失败: ${detail}`);
   } finally {
     batchIpUpdating.value = false;
   }
@@ -396,8 +470,9 @@ const handleRunIpOptimization = async () => {
   try {
     await store.runIpOptimization();
     toast.success('IP优选任务已启动，请留意通知或日志');
-  } catch (e) {
-    toast.error('启动IP优选失败');
+  } catch (e: any) {
+    const detail = e.response?.data?.detail || e.message || '未知错误';
+    toast.error(`启动IP优选失败: ${detail}`);
   } finally {
     optimizing.value = false;
   }
@@ -409,8 +484,9 @@ const handleClearAllTrackers = async () => {
   try {
     await store.clearAllTrackers();
     toast.success('所有 Tracker 已清空');
-  } catch (e) {
-    toast.error('清空失败');
+  } catch (e: any) {
+    const detail = e.response?.data?.detail || e.message || '未知错误';
+    toast.error(`清空失败: ${detail}`);
   } finally {
     clearing.value = false;
   }
@@ -421,8 +497,9 @@ const openWhitelistModal = async () => {
   loadingWhitelist.value = true;
   try {
     whitelistDomains.value = await store.fetchCloudflareDomains();
-  } catch (e) {
-    toast.error('获取白名单失败');
+  } catch (e: any) {
+    const detail = e.response?.data?.detail || e.message || '未知错误';
+    toast.error(`获取白名单失败: ${detail}`);
   } finally {
     loadingWhitelist.value = false;
   }
@@ -436,8 +513,9 @@ const handleAddWhitelistDomain = async () => {
     newWhitelistDomain.value = '';
     whitelistDomains.value = await store.fetchCloudflareDomains();
     toast.success('添加成功');
-  } catch (e) {
-    toast.error('添加失败');
+  } catch (e: any) {
+    const detail = e.response?.data?.detail || e.message || '未知错误';
+    toast.error(`添加失败: ${detail}`);
   } finally {
     addingWhitelist.value = false;
   }
@@ -449,8 +527,9 @@ const handleDeleteWhitelistDomain = async (domain: string) => {
     await store.deleteCloudflareDomain(domain);
     whitelistDomains.value = await store.fetchCloudflareDomains();
     toast.success('删除成功');
-  } catch (e) {
-    toast.error('删除失败');
+  } catch (e: any) {
+    const detail = e.response?.data?.detail || e.message || '未知错误';
+    toast.error(`删除白名单域失败: ${detail}`);
   }
 };
 </script>

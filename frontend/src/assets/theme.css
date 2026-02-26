@@ -2788,11 +2788,9 @@ input.form-control,
 }
 
 .btn-action-primary:hover {
-  /* Green */
+  background-color: var(--primary-hover);
+  border-color: var(--primary-hover);
   color: #fff;
-  padding: 0.35em 0.6em;
-  font-size: 0.75em;
-  border-radius: 50rem !important;
 }
 
 .badge-disabled {
