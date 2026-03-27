@@ -23,10 +23,15 @@
         <footer class="text-center py-3 text-muted small">
           <p class="mb-0">
             PT-Accelerator &copy; {{ new Date().getFullYear() }}
-            <span class="version-pill">
+            <span
+              class="version-pill"
+              tabindex="0"
+              @mouseenter="handleVersionPillFocus"
+              @focus="handleVersionPillFocus"
+            >
               {{ appVersion }}
               <span class="easter-egg-tooltip">
-                妹妹说紫色很有韵味！
+                {{ hitokotoText }}
                 <i class="star-1">✦</i>
                 <i class="star-2">★</i>
                 <i class="star-3">✦</i>
@@ -34,7 +39,7 @@
               </span>
             </span>
             <a href="https://github.com/KoWming/PT-Accelerator" target="_blank" class="github-link">
-              <i class="bi bi-github"></i>
+              <i class="bx bxl-github"></i>
               <span>GitHub</span>
             </a>
           </p>
@@ -59,6 +64,8 @@ const authStore = useAuthStore();
 
 const isLoginPage = computed(() => route.path === '/login');
 const sidebarOpen = ref(false);
+const hitokotoText = ref('妹妹说紫色很有韵味！');
+const isFetchingHitokoto = ref(false);
 
 const logout = async () => {
   await authStore.logout();
@@ -67,7 +74,37 @@ const logout = async () => {
 
 const appVersion = ref('');
 
+const fetchHitokoto = async () => {
+  if (isFetchingHitokoto.value) {
+    return;
+  }
+
+  isFetchingHitokoto.value = true;
+
+  try {
+    const response = await fetch('https://v1.hitokoto.cn/?encode=json');
+    if (!response.ok) {
+      throw new Error(`Failed to fetch hitokoto: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const from = data?.from ? ` —— ${data.from}` : '';
+    hitokotoText.value = `${data?.hitokoto || '妹妹说紫色很有韵味！'}${from}`;
+  } catch (error) {
+    console.error('Failed to fetch hitokoto', error);
+    hitokotoText.value = '妹妹说紫色很有韵味！';
+  } finally {
+    isFetchingHitokoto.value = false;
+  }
+};
+
+const handleVersionPillFocus = () => {
+  void fetchHitokoto();
+};
+
 onMounted(async () => {
+  void fetchHitokoto();
+
     try {
         const response = await fetch('/api/version');
         if (response.ok) {
@@ -84,43 +121,79 @@ onMounted(async () => {
 </script>
 
 <style>
-.fade-enter-active,
-.fade-leave-active {
-  transition: opacity 0.2s ease;
+.app-wrapper {
+  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
 }
 
-.fade-enter-from,
-.fade-leave-to {
-  opacity: 0;
+.main-content > footer {
+  margin-top: auto;
+  padding-inline: 1.5rem;
+}
+
+.main-content > main {
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.main-content > footer p {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+}
+
+.main-content {
+  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
+}
+
+@media (max-width: 767.98px) {
+  .app-wrapper,
+  .main-content {
+    height: auto;
+    overflow: visible;
+  }
+
+  .main-content > main {
+    overflow-y: visible;
+  }
 }
 
 .github-link {
+  text-decoration: none !important;
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
-  padding: 0.15rem 0.5rem;
-  border-radius: 50rem;
-  background: rgba(128, 128, 128, 0.1);
-  border: 1px solid transparent;
-  color: inherit;
-  transition: all 0.2s ease;
-  text-decoration: none !important;
-  box-shadow: none !important; /* Override global a tag shadow */
   line-height: 1;
 }
 
 .github-link:hover {
-  background: rgba(128, 128, 128, 0.2);
-  color: var(--primary-color) !important;
-  border-color: rgba(163, 112, 247, 0.3);
-  transform: translateY(-1px);
+  text-decoration: none !important;
 }
 
-/* Easter Egg Tooltip Styles */
 .version-pill {
   cursor: help;
   position: relative;
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 1.45rem;
+  padding: 0.3rem 0.7rem;
+  border-radius: 999px;
+  background: var(--bg-soft-primary);
+  color: var(--primary-color);
+  font-weight: 600;
+  line-height: 1;
+  outline: none;
+}
+
+.version-pill:focus-visible {
+  box-shadow: 0 0 0 0.2rem rgba(var(--bs-primary-rgb), 0.2);
 }
 
 .easter-egg-tooltip {
@@ -128,25 +201,27 @@ onMounted(async () => {
   bottom: 100%;
   left: 50%;
   transform: translateX(-50%) translateY(10px);
-  background: rgba(163, 112, 247, 0.9); /* Primary purple color */
+  background: linear-gradient(135deg, var(--primary-color), var(--primary-hover));
   color: white;
   padding: 0.5rem 1rem;
-  border-radius: 0.5rem;
+  border-radius: 0.75rem;
   font-size: 0.85rem;
-  white-space: nowrap; /* Prevent wrapping */
-  text-align: center; /* Center text */
+  white-space: normal;
+  text-align: center;
   opacity: 0;
   visibility: hidden;
-  transition: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55); /* Bouncy/smooth */
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   pointer-events: none;
-  box-shadow: 0 5px 15px rgba(163, 112, 247, 0.4);
+  box-shadow: var(--shadow-active);
   z-index: 100;
   margin-bottom: 8px;
-  font-weight: bold;
-  letter-spacing: 0.5px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  line-height: 1.55;
+  min-width: 14rem;
+  max-width: min(22rem, calc(100vw - 2rem));
 }
 
-/* Arrow for tooltip */
 .easter-egg-tooltip::after {
   content: '';
   position: absolute;
@@ -155,19 +230,19 @@ onMounted(async () => {
   margin-left: -5px;
   border-width: 5px;
   border-style: solid;
-  border-color: rgba(163, 112, 247, 0.9) transparent transparent transparent;
+  border-color: var(--primary-hover) transparent transparent transparent;
 }
 
-.version-pill:hover .easter-egg-tooltip {
+.version-pill:hover .easter-egg-tooltip,
+.version-pill:focus-visible .easter-egg-tooltip {
   opacity: 1;
   visibility: visible;
   transform: translateX(-50%) translateY(0);
 }
 
-/* Twinkling Stars */
 .star-1, .star-2, .star-3, .star-4 {
   position: absolute;
-  color: #FFD700; /* Gold */
+  color: #ffd66b;
   font-style: normal;
   animation: twinkle 1s infinite alternate;
   text-shadow: 0 0 5px rgba(255, 215, 0, 0.5);

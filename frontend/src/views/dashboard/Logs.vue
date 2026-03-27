@@ -1,44 +1,62 @@
 <template>
-  <div class="d-flex flex-column flex-grow-1 h-100">
-    <div class="page-header flex-shrink-0">
+  <div class="dashboard-redesign">
+    <div class="page-header">
       <h2 class="page-title">系统日志</h2>
       <Teleport to="#mobile-header-actions" :disabled="!isMobile">
-        <div class="d-flex gap-2" v-if="isMobile || true">
-          <button class="btn-pill btn-pill-primary" @click="fetchLogs" :disabled="loading">
+        <div class="page-header-actions" v-if="isMobile || true">
+          <button class="action-btn action-btn-primary action-btn-compact" @click="fetchLogs" :disabled="loading">
             <span>
-              <i class="bi bi-arrow-clockwise" :class="{ 'spin': loading, 'me-1': !isMobile }"></i> 
-              <span v-if="!isMobile">刷新</span>
+              <i class="bx bx-refresh" :class="{ spin: loading }"></i>
+              <span v-if="!isMobile">刷新日志</span>
             </span>
           </button>
-          <button class="btn-pill btn-pill-danger" @click="clearLogs" :disabled="clearing">
+          <button class="action-btn action-btn-danger action-btn-compact" @click="clearLogs" :disabled="clearing">
             <span>
-              <i class="bi bi-trash" :class="{ 'me-1': !isMobile }"></i> 
-              <span v-if="!isMobile">清空</span>
+              <i class="bx bx-trash"></i>
+              <span v-if="!isMobile">清空日志</span>
             </span>
           </button>
         </div>
       </Teleport>
     </div>
 
-    <div class="card shadow-sm overflow-hidden d-flex flex-column flex-grow-1">
-      <div class="card-body p-0 d-flex flex-column overflow-hidden">
-        <div class="log-viewer flex-grow-1" ref="logContainer">
-          <div v-if="parsedLogs.length === 0" class="text-center text-muted py-5">
-            暂无日志
+    <section class="logs-layout">
+      <article class="workspace-card logs-card">
+        <header class="workspace-card-header logs-card-header">
+          <div class="logs-card-heading">
+            <div class="logs-card-title-row">
+              <h3>
+                日志流
+                <span class="log-count">({{ parsedLogs.length }}条)</span>
+              </h3>
+              <span class="workspace-pill" :class="parsedLogs.length ? 'success' : 'danger'">
+                <span class="workspace-pill-dot"></span>
+                {{ parsedLogs.length ? 'READY' : 'EMPTY' }}
+              </span>
+            </div>
+            <p>记录 IP 优选、Hosts 更新与调度任务的执行细节。</p>
           </div>
-          <div v-else>
+        </header>
+
+        <div class="log-viewer" ref="logContainer">
+          <div v-if="parsedLogs.length === 0" class="workspace-empty logs-empty">
+            <i class="bx bx-file-blank"></i>
+            <strong>暂无日志</strong>
+            <span>执行一次任务后，这里会展示完整运行记录。</span>
+          </div>
+          <div v-else class="log-stream">
             <div v-for="(log, index) in parsedLogs" :key="index" class="log-row">
               <div class="log-col-badge">
                 <span class="log-badge" :class="getBadgeClass(log.level)">{{ log.level }}</span>
               </div>
-              <div class="log-col-time">{{ log.time }}</div>
-              <div class="log-col-module">{{ log.module }}</div>
+              <div class="log-col-time mono-text">{{ log.time || '--' }}</div>
+              <div class="log-col-module">{{ log.module || 'system' }}</div>
               <div class="log-col-message" :class="getMessageClass(log.level)">{{ log.message }}</div>
             </div>
           </div>
         </div>
-      </div>
-    </div>
+      </article>
+    </section>
   </div>
 </template>
 
@@ -148,6 +166,203 @@ watch(() => store.logs, () => {
 </script>
 
 <style scoped>
+.dashboard-redesign {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  gap: 1.5rem;
+}
+
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.12rem;
+}
+
+.page-header-actions {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.logs-layout {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+}
+
+.workspace-card {
+  min-width: 0;
+  border-radius: 1.4rem;
+  background: var(--bg-surface);
+  border: 1px solid rgba(161, 172, 184, 0.14);
+  box-shadow: var(--shadow-sm);
+}
+
+.logs-card {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  padding: 1.5rem;
+  overflow: hidden;
+}
+
+.workspace-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+  flex-wrap: wrap;
+}
+
+.logs-card-header {
+  align-items: center;
+}
+
+.logs-card-heading {
+  flex: 1 1 240px;
+  min-width: 0;
+}
+
+.logs-card-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.85rem;
+  flex-wrap: nowrap;
+}
+
+.logs-card-title-row .workspace-pill {
+  flex-shrink: 0;
+}
+
+.workspace-card-header h3 {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--text-heading);
+}
+
+.log-count {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: rgba(105, 122, 141, 0.72);
+}
+
+.workspace-card-header p {
+  margin: 0.4rem 0 0;
+  color: var(--text-muted);
+  line-height: 1.65;
+}
+
+.workspace-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  min-width: 5.5rem;
+  padding: 0.42rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+
+.workspace-pill-dot {
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 50%;
+  background: currentColor;
+  flex-shrink: 0;
+}
+
+.workspace-pill.success {
+  color: var(--success-color);
+  background: rgba(74, 179, 126, 0.14);
+}
+
+.workspace-pill.danger {
+  color: var(--danger-color);
+  background: rgba(225, 108, 108, 0.14);
+}
+
+.action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+  border-radius: 0.95rem;
+  padding: 0.8rem 1rem;
+  font-weight: 600;
+  font-size: 0.92rem;
+  transition: transform var(--transition-base), box-shadow var(--transition-base), border-color var(--transition-base), background-color var(--transition-base);
+}
+
+.action-btn-compact {
+  padding: 0.58rem 0.82rem;
+  border-radius: 0.8rem;
+  font-size: 0.84rem;
+}
+
+.action-btn-compact i {
+  font-size: 1rem;
+}
+
+.action-btn span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.action-btn:hover:not(:disabled),
+.action-btn:focus-visible:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-sm);
+}
+
+.action-btn:focus-visible {
+  outline: none;
+}
+
+.action-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.action-btn-primary {
+  background: rgba(var(--primary-rgb), 0.1);
+  color: var(--primary-color);
+  border-color: rgba(var(--primary-rgb), 0.16);
+}
+
+.action-btn-primary:hover:not(:disabled),
+.action-btn-primary:focus-visible:not(:disabled) {
+  background: rgba(var(--primary-rgb), 0.14);
+  border-color: rgba(var(--primary-rgb), 0.28);
+}
+
+.action-btn-danger {
+  background: rgba(225, 108, 108, 0.1);
+  color: var(--danger-color);
+  border-color: rgba(225, 108, 108, 0.16);
+}
+
+.action-btn-danger:hover:not(:disabled),
+.action-btn-danger:focus-visible:not(:disabled) {
+  background: rgba(225, 108, 108, 0.14);
+  border-color: rgba(225, 108, 108, 0.28);
+}
+
 .spin {
   animation: spin 1s linear infinite;
 }
@@ -158,6 +373,199 @@ watch(() => store.logs, () => {
 }
 
 .log-viewer {
-  height: 70vh;
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  height: 62vh;
+  overflow: hidden;
+  padding-right: 0;
+  border-radius: 1rem;
+}
+
+.log-stream {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  height: 100%;
+  min-width: 0;
+  overflow: auto;
+  border-radius: inherit;
+  scrollbar-gutter: stable;
+}
+
+.log-row {
+  display: grid;
+  grid-template-columns: 3.7rem 11.3rem minmax(12.2rem, 13rem) minmax(0, 1fr);
+  column-gap: 0.7rem;
+  row-gap: 0;
+  align-items: center;
+  padding: 1rem;
+  border-bottom: 1px solid rgba(161, 172, 184, 0.12);
+  transition: background-color var(--transition-base);
+}
+
+.log-row:hover {
+  background: rgba(161, 172, 184, 0.06);
+}
+
+.log-row:last-child {
+  border-bottom: none;
+}
+
+.log-col-badge {
+  display: flex;
+  width: 100%;
+  justify-content: center;
+  align-items: center;
+  min-width: 0;
+}
+
+.log-col-time,
+.log-col-module,
+.log-col-message {
+  min-width: 0;
+}
+
+.log-col-time {
+  padding-left: 0.26rem;
+  color: var(--text-heading);
+  font-size: 0.84rem;
+}
+
+.log-col-module {
+  padding-right: 0.2rem;
+  color: var(--text-muted);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.log-col-message {
+  padding-left: 0.1rem;
+  color: var(--text-heading);
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.log-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  min-width: 3.45rem;
+  max-width: 100%;
+  padding: 0.28rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.67rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.log-badge-error {
+  color: var(--danger-color);
+  background: rgba(225, 108, 108, 0.14);
+}
+
+.log-badge-warning {
+  color: #b7791f;
+  background: rgba(255, 193, 7, 0.16);
+}
+
+.log-badge-info {
+  color: #2d8da8;
+  background: rgba(79, 183, 211, 0.16);
+}
+
+.log-badge-debug {
+  color: var(--primary-color);
+  background: rgba(var(--primary-rgb), 0.16);
+}
+
+.log-message-error {
+  color: #b33f3f;
+}
+
+.log-message-warning {
+  color: #9a6b16;
+}
+
+.log-message-info {
+  color: var(--text-heading);
+}
+
+.log-message-debug {
+  color: #566a7f;
+}
+
+.workspace-empty {
+  min-height: 24rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.workspace-empty i {
+  font-size: 2.2rem;
+}
+
+.workspace-empty strong {
+  color: var(--text-heading);
+  font-size: 1rem;
+}
+
+.mono-text {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+}
+
+@media (max-width: 1200px) {
+  .log-row {
+    grid-template-columns: 3.4rem 10.6rem minmax(10.5rem, 11.2rem) minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 991.98px) {
+  .log-row {
+    grid-template-columns: 1fr;
+    row-gap: 0.55rem;
+  }
+}
+
+@media (max-width: 767.98px) {
+  .page-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .logs-card {
+    padding: 1rem;
+  }
+
+  .log-viewer {
+    height: auto;
+    max-height: 70vh;
+  }
+
+  .log-row {
+    grid-template-columns: 1fr;
+  }
+
+  .page-header-actions {
+    width: 100%;
+    order: 3;
+  }
+
+  .action-btn {
+    flex: 1 1 0;
+  }
+
+  .logs-card-title-row {
+    gap: 0.7rem;
+  }
 }
 </style>

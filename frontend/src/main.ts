@@ -7,16 +7,18 @@ import router from './router'
 import 'bootstrap/dist/css/bootstrap.min.css'
 import 'bootstrap/dist/js/bootstrap.bundle.min.js'
 import 'bootstrap-icons/font/bootstrap-icons.css'
+import 'vue-toastification/dist/index.css'
+import './style.css'
 import './assets/theme.css'
+import './assets/theme-sneat.css'
 
 import Toast, { type PluginOptions, POSITION } from 'vue-toastification'
-import 'vue-toastification/dist/index.css'
 
 const app = createApp(App)
 
 const options: PluginOptions = {
     position: POSITION.TOP_RIGHT,
-    timeout: 3000,
+    timeout: 3200,
     closeOnClick: true,
     pauseOnFocusLoss: true,
     pauseOnHover: true,
@@ -26,7 +28,13 @@ const options: PluginOptions = {
     hideProgressBar: false,
     closeButton: "button",
     icon: true,
-    rtl: false
+    rtl: false,
+    newestOnTop: true,
+    transition: {
+        enter: 'Vue-Toastification__fade-enter-active',
+        leave: 'Vue-Toastification__fade-leave-active',
+        move: 'Vue-Toastification__fade-move'
+    }
 }
 
 app.use(createPinia())

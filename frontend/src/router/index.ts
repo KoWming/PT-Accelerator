@@ -43,7 +43,21 @@ const router = createRouter({
                 },
                 {
                     path: 'settings',
-                    name: 'settings',
+                    redirect: '/settings/system',
+                },
+                {
+                    path: 'settings/system',
+                    name: 'settings-system',
+                    component: () => import('../views/dashboard/Settings.vue'),
+                },
+                {
+                    path: 'settings/notification',
+                    name: 'settings-notification',
+                    component: () => import('../views/dashboard/Settings.vue'),
+                },
+                {
+                    path: 'settings/backup',
+                    name: 'settings-backup',
                     component: () => import('../views/dashboard/Settings.vue'),
                 },
             ],

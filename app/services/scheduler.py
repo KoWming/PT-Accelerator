@@ -1,5 +1,6 @@
 import logging
 from typing import Dict, Any
+from datetime import datetime
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 
@@ -214,6 +215,25 @@ class SchedulerService:
                 jobs.append({
                     "id": job.id,
                     "name": job.name,
+                    "next_run": next_run
+                })
+
+            has_backup_job = any(job.get("id") == "backup_config_task" for job in jobs)
+            backup_config = self.config.get("backup", {})
+            if backup_config.get("enable", False) and not has_backup_job:
+                cron_expr = backup_config.get("cron", "0 2 * * *")
+                next_run = "未安排"
+                try:
+                    trigger = CronTrigger.from_crontab(cron_expr)
+                    next_fire_time = trigger.get_next_fire_time(None, datetime.now())
+                    if next_fire_time:
+                        next_run = next_fire_time.strftime("%Y-%m-%d %H:%M:%S")
+                except Exception as e:
+                    logger.warning(f"计算备份任务下次执行时间失败: {str(e)}")
+
+                jobs.append({
+                    "id": "backup_config_task",
+                    "name": "配置备份定时任务",
                     "next_run": next_run
                 })
         return jobs

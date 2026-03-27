@@ -2,9 +2,9 @@
   <!-- Header is now only for mobile sidebar toggle -->
   <header class="header d-flex align-items-center px-4 py-3 d-lg-none">
     <button class="btn btn-icon text-primary me-3" @click="$emit('toggle-sidebar')">
-      <i class="bi bi-list fs-4"></i>
+      <i class="bx bx-menu fs-4"></i>
     </button>
-    <h5 class="mb-0 fw-bold text-main flex-grow-1">{{ pageTitle }}</h5>
+    <h5 class="header-title mb-0 fw-bold flex-grow-1">{{ pageTitle }}</h5>
     <div id="mobile-header-actions" class="d-flex align-items-center gap-2"></div>
   </header>
 </template>
@@ -40,15 +40,15 @@ const pageTitle = computed(() => {
 
 <style scoped>
 .header {
-  height: 60px;
+  height: 64px;
   position: sticky;
   top: 0;
   z-index: 1020;
   background: var(--bg-header);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border-bottom: 1px solid var(--glass-border);
-  box-shadow: var(--shadow-sm);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--divider-color);
+  box-shadow: 0 0.125rem 0.75rem rgba(67, 89, 113, 0.08);
 }
 
 .btn-icon {
@@ -57,15 +57,21 @@ const pageTitle = computed(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 50%;
-  transition: all 0.2s;
+  border-radius: 0.75rem;
+  transition: all var(--transition-fast);
   border: none;
-  background: transparent;
+  background: var(--bg-soft-primary);
   margin-left: -10px; /* Align with padding */
 }
 
 .btn-icon:hover {
-  background: rgba(255, 255, 255, 0.1);
-  color: var(--text-main) !important;
+  background: rgba(var(--primary-rgb), 0.16);
+  color: var(--primary-color) !important;
+  transform: translateY(-1px);
+}
+
+.header-title {
+  color: var(--text-heading);
+  letter-spacing: -0.01em;
 }
 </style>

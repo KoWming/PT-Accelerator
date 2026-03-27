@@ -13,6 +13,7 @@
     "axios": "^1.13.2",
     "bootstrap": "^5.3.8",
     "bootstrap-icons": "^1.13.1",
+    "boxicons": "^2.1.4",
     "pinia": "^3.0.4",
     "sass": "^1.94.2",
     "vue": "^3.5.24",

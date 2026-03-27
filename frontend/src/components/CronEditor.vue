@@ -15,7 +15,7 @@
               @click.stop="toggleTab('month')"
             >
               {{ getBadgeText('month') }}
-              <i v-if="state.month.type !== 'every'" class="bi bi-x ms-1" @click.stop="resetField('month')"></i>
+              <i v-if="state.month.type !== 'every'" class="bx bx-x ms-1" @click.stop="resetField('month')"></i>
             </button>
           </div>
 
@@ -30,7 +30,7 @@
               @click.stop="toggleTab('day')"
             >
               {{ getBadgeText('day') }}
-              <i v-if="state.day.type !== 'every'" class="bi bi-x ms-1" @click.stop="resetField('day')"></i>
+              <i v-if="state.day.type !== 'every'" class="bx bx-x ms-1" @click.stop="resetField('day')"></i>
             </button>
           </div>
 
@@ -45,7 +45,7 @@
               @click.stop="toggleTab('week')"
             >
               {{ getBadgeText('week') }}
-              <i v-if="state.week.type !== 'every'" class="bi bi-x ms-1" @click.stop="resetField('week')"></i>
+              <i v-if="state.week.type !== 'every'" class="bx bx-x ms-1" @click.stop="resetField('week')"></i>
             </button>
           </div>
 
@@ -60,7 +60,7 @@
               @click.stop="toggleTab('hour')"
             >
               {{ getBadgeText('hour') }}
-              <i v-if="state.hour.type !== 'every'" class="bi bi-x ms-1" @click.stop="resetField('hour')"></i>
+              <i v-if="state.hour.type !== 'every'" class="bx bx-x ms-1" @click.stop="resetField('hour')"></i>
             </button>
           </div>
 
@@ -75,7 +75,7 @@
               @click.stop="toggleTab('minute')"
             >
               {{ getBadgeText('minute') }}
-              <i v-if="state.minute.type !== 'every'" class="bi bi-x ms-1" @click.stop="resetField('minute')"></i>
+              <i v-if="state.minute.type !== 'every'" class="bx bx-x ms-1" @click.stop="resetField('minute')"></i>
             </button>
           </div>
         </div>
@@ -148,7 +148,7 @@
         </div>
         
         <div v-else class="text-center py-5 text-muted rounded border border-dashed flex-grow-1 d-flex flex-column justify-content-center empty-state">
-          <i class="bi bi-hand-index-thumb fs-1 d-block mb-2 opacity-50"></i>
+          <i class="bx bx-hand fs-1 d-block mb-2 opacity-50"></i>
           <small>点击上方标签进行编辑</small>
         </div>
       </div>
@@ -347,13 +347,6 @@ watch(state, () => {
   border-radius: 0.2rem;
 }
 .btn-primary-soft {
-  background-color: rgba(163, 112, 247, 0.1);
-  color: var(--primary-color);
-  border-color: transparent;
-}
-.btn-primary-soft:hover {
-  background-color: rgba(163, 112, 247, 0.2);
-  color: var(--primary-hover);
 }
 .form-check-input:checked {
   background-color: var(--primary-color);

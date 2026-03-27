@@ -4,14 +4,14 @@
       <div class="card-body p-5">
         <div class="text-center mb-4">
           <div class="icon-circle bg-primary bg-opacity-10 text-primary mb-3 mx-auto d-flex align-items-center justify-content-center">
-            <i class="bi bi-lightning-charge-fill fs-2"></i>
+            <i class="bx bxs-bolt-circle fs-2"></i>
           </div>
           <h3 class="fw-bold mb-1">PT-Accelerator</h3>
           <p class="text-muted small">KoWming Edition</p>
         </div>
 
         <div v-if="error" class="alert alert-danger d-flex align-items-center" role="alert">
-          <i class="bi bi-exclamation-circle-fill me-2"></i>
+          <i class="bx bxs-error-circle me-2"></i>
           <div>{{ error }}</div>
         </div>
 
@@ -20,7 +20,7 @@
             <label for="username" class="form-label">用户名</label>
             <div class="input-group custom-input-group">
               <span class="input-group-text bg-transparent border-0">
-                <i class="bi bi-person text-muted"></i>
+                <i class="bx bx-user text-muted"></i>
               </span>
               <input
                 type="text"
@@ -37,7 +37,7 @@
             <label for="password" class="form-label">密码</label>
             <div class="input-group custom-input-group">
               <span class="input-group-text bg-transparent border-0">
-                <i class="bi bi-lock text-muted"></i>
+                <i class="bx bx-lock-alt text-muted"></i>
               </span>
               <input
                 type="password"
@@ -117,36 +117,38 @@ const handleLogin = async () => {
 
 <style scoped>
 .login-container {
-  /* Use global background instead of overriding it, or use a transparent one */
+  padding: 1.5rem;
   background: transparent;
 }
 
 .login-card {
   width: 100%;
   max-width: 400px;
-  backdrop-filter: blur(20px);
-  background: var(--glass-bg);
-  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(18px);
+  background: color-mix(in srgb, var(--bg-surface) 92%, transparent);
+  border: 1px solid var(--border-color);
+  box-shadow: var(--shadow-lg);
 }
 
 .icon-circle {
   width: 80px;
   height: 80px;
   border-radius: 50%;
-  background: rgba(var(--primary-color), 0.1); /* Use primary color variable */
+  background: var(--bg-soft-primary);
 }
 
-/* Custom Input Group Styles */
 .custom-input-group {
-  border: 1px solid var(--glass-border);
-  border-radius: 0.5rem;
-  transition: all 0.3s ease;
-  background: rgba(255, 255, 255, 0.05);
-  overflow: hidden; /* Ensure children don't overflow rounded corners */
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  transition: all var(--transition-fast);
+  background: var(--bg-surface-alt);
+  overflow: hidden;
+  box-shadow: inset 0 1px 2px rgba(67, 89, 113, 0.04);
 }
 
 .custom-input-group:focus-within {
-  border-color: var(--primary-color);
+  border-color: rgba(var(--primary-rgb), 0.4);
+  box-shadow: 0 0 0 0.25rem rgba(var(--primary-rgb), 0.12);
 }
 
 .custom-input-group .input-group-text {
