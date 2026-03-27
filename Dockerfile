@@ -4,7 +4,7 @@ WORKDIR /app/frontend
 COPY frontend/package.json frontend/package-lock.json* ./
 RUN npm install
 COPY frontend .
-RUN npm run build
+RUN npx vite build
 
 # Base stage
 FROM python:3.11-slim AS base
