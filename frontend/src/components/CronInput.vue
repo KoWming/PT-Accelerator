@@ -62,7 +62,7 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref } from 'vue';
 
-const props = defineProps<{
+defineProps<{
   modelValue: string;
 }>();
 

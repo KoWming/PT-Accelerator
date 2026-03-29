@@ -1450,9 +1450,9 @@ const handleSaveHosts = async () => {
   }
 
   .source-table {
-    border-radius: 0;
-    border-left: none;
-    border-right: none;
+    border-radius: 1rem;
+    border-left: 1px solid rgba(161, 172, 184, 0.12);
+    border-right: 1px solid rgba(161, 172, 184, 0.12);
   }
 
   .source-table-header {

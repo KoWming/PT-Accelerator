@@ -111,11 +111,11 @@ onMounted(async () => {
             const data = await response.json();
             appVersion.value = 'v' + data.version;
         } else {
-            appVersion.value = 'v2.0.8'; // Fallback
+          appVersion.value = 'v2.2.1'; // Fallback
         }
     } catch (e) {
         console.error('Failed to fetch version', e);
-        appVersion.value = 'v2.0.7'; // Fallback
+        appVersion.value = 'v2.2.1'; // Fallback
     }
 });
 </script>
@@ -161,6 +161,14 @@ onMounted(async () => {
 
   .main-content > main {
     overflow-y: visible;
+    padding-left: 0.7rem !important;
+    padding-right: 0.7rem !important;
+    padding-bottom: 0.85rem !important;
+    padding-top: 0.85rem !important;
+  }
+
+  .main-content > footer {
+    padding-inline: 0.7rem;
   }
 }
 

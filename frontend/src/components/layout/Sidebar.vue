@@ -96,8 +96,8 @@
           <div class="text-muted x-small text-truncate">Online</div>
         </div>
         
-        <button class="btn btn-link text-main p-0 opacity-75 hover-opacity-100" @click="toggleTheme" title="切换主题">
-          <i class="bx" :class="isDark ? 'bx-moon' : 'bx-sun'"></i>
+        <button class="btn btn-link text-main p-0 opacity-75 hover-opacity-100" @click="toggleTheme" :title="themeToggleTitle">
+          <i class="bx" :class="themeIconClass"></i>
         </button>
         
         <button class="btn btn-link text-main p-0 opacity-75 hover-opacity-100" @click="$emit('logout')" title="退出登录">
@@ -116,6 +116,8 @@ import { ref, onMounted, watch, computed, nextTick, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router';
 import { useAuthStore } from '../../stores/auth';
 
+type ThemeMode = 'system' | 'dark' | 'light';
+
 defineProps<{
   isOpen: boolean
 }>();
@@ -125,8 +127,11 @@ defineEmits(['close', 'logout']);
 const route = useRoute();
 const router = useRouter();
 const authStore = useAuthStore();
+const MOBILE_BREAKPOINT = 767.98;
 const isDark = ref(true);
-const isSettingsGroupOpen = ref(true);
+const themeMode = ref<ThemeMode>('system');
+const isMobileViewport = ref(false);
+const isSettingsGroupOpen = ref(false);
 const highlightsReady = ref(false);
 const hasInitializedHighlights = ref(false);
 const mainHighlightVisible = ref(false);
@@ -165,6 +170,28 @@ const activeSettingsTab = computed(() => {
   if (route.path.startsWith('/settings/backup')) return 'backup';
   return 'system';
 });
+
+const themeIconClass = computed(() => {
+  if (themeMode.value === 'system') {
+    return 'bx-desktop';
+  }
+  return isDark.value ? 'bx-moon' : 'bx-sun';
+});
+
+const themeToggleTitle = computed(() => {
+  if (themeMode.value === 'system') {
+    return '当前跟随系统主题，点击切换为深色主题';
+  }
+  if (themeMode.value === 'dark') {
+    return '当前为深色主题，点击切换为浅色主题';
+  }
+  return '当前为浅色主题，点击切换为跟随系统主题';
+});
+
+const updateViewportState = () => {
+  if (typeof window === 'undefined') return;
+  isMobileViewport.value = window.innerWidth <= MOBILE_BREAKPOINT;
+};
 
 const updateHighlight = (container: HTMLElement | null, selector: string, styleRef: { value: Record<string, string> }, options?: { insetTop?: number; insetX?: number; radius?: string }) => {
   if (!container) {
@@ -256,7 +283,9 @@ const initializeHighlights = async () => {
 const syncSettingsGroup = () => {
   if (isSettingsRoute.value) {
     isSettingsGroupOpen.value = true;
+    return;
   }
+  isSettingsGroupOpen.value = !isMobileViewport.value;
 };
 
 const toggleSettingsGroup = () => {
@@ -264,19 +293,49 @@ const toggleSettingsGroup = () => {
 };
 
 const toggleTheme = () => {
-  isDark.value = !isDark.value;
+  if (themeMode.value === 'system') {
+    themeMode.value = 'dark';
+  } else if (themeMode.value === 'dark') {
+    themeMode.value = 'light';
+  } else {
+    themeMode.value = 'system';
+  }
   updateTheme();
+};
+
+const getSystemPrefersDark = () => {
+  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+    return true;
+  }
+  return window.matchMedia('(prefers-color-scheme: dark)').matches;
 };
 
 const updateTheme = () => {
   const body = document.body;
-  if (isDark.value) {
+  const shouldUseDark = themeMode.value === 'system' ? getSystemPrefersDark() : themeMode.value === 'dark';
+
+  isDark.value = shouldUseDark;
+
+  if (shouldUseDark) {
     body.classList.remove('light-theme');
-    localStorage.setItem('theme', 'dark');
   } else {
     body.classList.add('light-theme');
-    localStorage.setItem('theme', 'light');
   }
+
+  localStorage.setItem('theme', themeMode.value);
+};
+
+const handleSystemThemeChange = () => {
+  if (themeMode.value !== 'system') {
+    return;
+  }
+  updateTheme();
+};
+
+const handleResize = () => {
+  updateViewportState();
+  syncSettingsGroup();
+  void syncNavHighlights();
 };
 
 watch(() => route.path, () => {
@@ -295,22 +354,31 @@ watch(isSettingsGroupOpen, () => {
 });
 
 onMounted(async () => {
+  updateViewportState();
+
   const savedTheme = localStorage.getItem('theme');
-  if (savedTheme === 'light') {
-    isDark.value = false;
-    document.body.classList.add('light-theme');
+  if (savedTheme === 'light' || savedTheme === 'dark' || savedTheme === 'system') {
+    themeMode.value = savedTheme;
   } else {
-    isDark.value = true;
-    document.body.classList.remove('light-theme');
+    themeMode.value = 'system';
+  }
+
+  updateTheme();
+
+  if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', handleSystemThemeChange);
   }
 
   syncSettingsGroup();
   await initializeHighlights();
-  window.addEventListener('resize', syncNavHighlights);
+  window.addEventListener('resize', handleResize);
 });
 
 onBeforeUnmount(() => {
-  window.removeEventListener('resize', syncNavHighlights);
+  if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
+    window.matchMedia('(prefers-color-scheme: dark)').removeEventListener('change', handleSystemThemeChange);
+  }
+  window.removeEventListener('resize', handleResize);
 });
 </script>
 

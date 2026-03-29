@@ -46,10 +46,12 @@
           </div>
           <div v-else class="log-stream">
             <div v-for="(log, index) in parsedLogs" :key="index" class="log-row">
-              <div class="log-col-badge">
-                <span class="log-badge" :class="getBadgeClass(log.level)">{{ log.level }}</span>
+              <div class="log-col-meta">
+                <div class="log-col-badge">
+                  <span class="log-badge" :class="getBadgeClass(log.level)">{{ log.level }}</span>
+                </div>
+                <div class="log-col-time mono-text">{{ log.time || '--' }}</div>
               </div>
-              <div class="log-col-time mono-text">{{ log.time || '--' }}</div>
               <div class="log-col-module">{{ log.module || 'system' }}</div>
               <div class="log-col-message" :class="getMessageClass(log.level)">{{ log.message }}</div>
             </div>
@@ -412,6 +414,10 @@ watch(() => store.logs, () => {
   border-bottom: none;
 }
 
+.log-col-meta {
+  display: contents;
+}
+
 .log-col-badge {
   display: flex;
   width: 100%;
@@ -424,6 +430,10 @@ watch(() => store.logs, () => {
 .log-col-module,
 .log-col-message {
   min-width: 0;
+}
+
+.log-col-meta .log-col-time {
+  width: 100%;
 }
 
 .log-col-time {
@@ -519,6 +529,41 @@ watch(() => store.logs, () => {
   font-size: 1rem;
 }
 
+@media (max-width: 767.98px) {
+  .log-row {
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 0.55rem;
+    align-items: start;
+  }
+
+  .log-col-meta {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 0.12rem;
+    min-width: 0;
+  }
+
+  .log-col-badge {
+    width: auto;
+    justify-content: flex-start;
+    flex-shrink: 0;
+  }
+
+  .log-col-time {
+    padding-left: 0;
+    margin-left: -0.1rem;
+    width: auto;
+    text-align: left;
+    font-size: 0.8rem;
+  }
+
+  .log-col-module,
+  .log-col-message {
+    padding-left: 0;
+  }
+}
+
 .mono-text {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
 }
@@ -533,6 +578,33 @@ watch(() => store.logs, () => {
   .log-row {
     grid-template-columns: 1fr;
     row-gap: 0.55rem;
+  }
+
+  .log-col-meta {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 0.12rem;
+    min-width: 0;
+  }
+
+  .log-col-badge {
+    width: auto;
+    justify-content: flex-start;
+    flex-shrink: 0;
+  }
+
+  .log-col-time {
+    padding-left: 0;
+    margin-left: -0.1rem;
+    width: auto;
+    text-align: left;
+    font-size: 0.8rem;
+  }
+
+  .log-col-module,
+  .log-col-message {
+    padding-left: 0;
   }
 }
 

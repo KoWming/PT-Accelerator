@@ -379,28 +379,28 @@
     <!-- Backup Restore Modal -->
     <!-- Backup Restore Modal -->
     <Teleport to="body">
-      <div v-if="showBackupModal" class="modal fade show" style="display: block; background: rgba(0,0,0,0.5);" tabindex="-1" @click.self="showBackupModal = false">
-        <div class="modal-dialog modal-dialog-centered">
-          <div class="modal-content">
-            <div class="modal-header">
+      <div v-if="showBackupModal" class="modal fade show settings-backup-modal" style="display: block;" tabindex="-1" @click.self="showBackupModal = false">
+        <div class="modal-dialog modal-dialog-centered settings-backup-modal-dialog">
+          <div class="modal-content settings-backup-modal-content">
+            <div class="modal-header settings-backup-modal-header">
               <h5 class="modal-title">恢复备份</h5>
-              <button type="button" class="btn-close" @click="showBackupModal = false"></button>
+              <button type="button" class="btn-close settings-backup-modal-close" @click="showBackupModal = false"></button>
             </div>
-            <div class="modal-body">
-              <div v-if="loadingBackups" class="text-center py-4">
+            <div class="modal-body settings-backup-modal-body">
+              <div v-if="loadingBackups" class="settings-backup-modal-state text-center py-4">
                 <div class="spinner-border text-primary" role="status"></div>
                 <p class="mt-2 text-muted">正在获取备份列表...</p>
               </div>
-              <div v-else-if="backups.length === 0" class="text-center py-4 text-muted">
+              <div v-else-if="backups.length === 0" class="settings-backup-modal-state text-center py-4 text-muted">
                 未找到备份文件
               </div>
-              <div v-else class="list-group list-group-flush">
+              <div v-else class="list-group list-group-flush settings-backup-list">
                 <button v-for="backup in backups" :key="backup.filename" 
                         class="list-group-item list-group-item-action d-flex justify-content-between align-items-center bg-transparent text-main border-0 rounded-3 mb-1 backup-item"
                         @click="confirmRestore(backup)">
                   <div>
                     <div class="fw-bold">{{ backup.filename }}</div>
-                    <small class="text-muted">{{ backup.last_modified }} ({{ formatSize(backup.size) }})</small>
+                    <small class="text-muted">{{ formatBackupTime(backup.last_modified) }} ({{ formatSize(backup.size) }})</small>
                   </div>
                   <i class="bx bx-reset"></i>
                 </button>
@@ -719,6 +719,24 @@ const formatSize = (bytes: string | number) => {
   if (b < 1024) return b + ' B';
   if (b < 1024 * 1024) return (b / 1024).toFixed(1) + ' KB';
   return (b / (1024 * 1024)).toFixed(1) + ' MB';
+};
+
+const formatBackupTime = (value: string) => {
+  if (!value) return '--';
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+
+  const pad = (num: number) => String(num).padStart(2, '0');
+
+  const year = date.getFullYear();
+  const month = pad(date.getMonth() + 1);
+  const day = pad(date.getDate());
+  const hour = pad(date.getHours());
+  const minute = pad(date.getMinutes());
+  const second = pad(date.getSeconds());
+
+  return `${year}年${month}月${day}日 ${hour}:${minute}:${second}`;
 };
 
 const runBackupNow = async () => {
@@ -1618,6 +1636,63 @@ const getChannelTypeLabel = (type: string) => {
   border: 1px solid transparent !important;
 }
 
+.settings-backup-modal {
+  background: var(--bg-overlay);
+}
+
+.settings-backup-modal-dialog {
+  max-width: 42rem;
+  padding: 0.85rem;
+}
+
+.settings-backup-modal-content {
+  border: 1px solid rgba(161, 172, 184, 0.16);
+  border-radius: 1.2rem;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--bg-surface) 94%, white 6%);
+  box-shadow: 0 1.1rem 2.4rem rgba(15, 23, 42, 0.16);
+}
+
+.settings-backup-modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.8rem;
+  padding: 1rem 1.15rem 0.85rem;
+  border-bottom: 1px solid var(--divider-color);
+  background: linear-gradient(180deg, rgba(var(--primary-rgb), 0.055), transparent 100%);
+}
+
+.settings-backup-modal-header .modal-title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text-heading);
+}
+
+.settings-backup-modal-close {
+  flex-shrink: 0;
+  margin: 0;
+}
+
+.settings-backup-modal-body {
+  padding: 1rem 1.15rem;
+}
+
+.settings-backup-modal-state {
+  min-height: 8rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.settings-backup-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
 .backup-item:hover {
   background-color: rgba(var(--primary-rgb), 0.08) !important;
   border-color: rgba(var(--primary-rgb), 0.28) !important;
@@ -1642,6 +1717,16 @@ const getChannelTypeLabel = (type: string) => {
   .settings-auth-toggle-card,
   .settings-form-block {
     padding: 1rem;
+  }
+
+  .settings-backup-modal-dialog {
+    padding: 0.5rem;
+  }
+
+  .settings-backup-modal-header,
+  .settings-backup-modal-body {
+    padding-left: 0.95rem;
+    padding-right: 0.95rem;
   }
 
   .settings-inline-note {

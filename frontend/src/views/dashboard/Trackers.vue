@@ -143,8 +143,10 @@
                 <div class="tracker-col-name">
                   <strong>{{ tracker.name }}</strong>
                 </div>
-                <div class="tracker-col-domain mono-text" :title="tracker.domain">{{ tracker.domain }}</div>
-                <div class="tracker-col-ip mono-text">{{ tracker.ip || '未设置' }}</div>
+                <div class="tracker-col-network">
+                  <div class="tracker-col-domain mono-text" :title="tracker.domain">{{ tracker.domain }}</div>
+                  <div class="tracker-col-ip mono-text">{{ tracker.ip || '未设置' }}</div>
+                </div>
                 <div class="tracker-col-switch">
                   <label class="switch tracker-switch">
                     <input type="checkbox" :checked="tracker.enable" @change="toggleTracker(tracker)">
@@ -1716,6 +1718,7 @@ const handleDeleteWhitelistDomain = async (domain: string) => {
 }
 
 .tracker-col-name,
+.tracker-col-network,
 .tracker-col-domain,
 .tracker-col-ip,
 .tracker-col-switch,
@@ -1729,6 +1732,10 @@ const handleDeleteWhitelistDomain = async (domain: string) => {
   font-size: 0.86rem;
   font-weight: 700;
   white-space: nowrap;
+}
+
+.tracker-col-network {
+  display: contents;
 }
 
 .tracker-col-domain,
@@ -1932,9 +1939,53 @@ const handleDeleteWhitelistDomain = async (domain: string) => {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .tracker-table-header,
+  .tracker-table-header {
+    display: none;
+  }
+
   .tracker-row {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) minmax(10rem, 1fr);
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "name toggle"
+      "network network"
+      "actions actions";
+    gap: 0.8rem;
+    padding: 1rem 0.2rem;
+  }
+
+  .tracker-col-name {
+    grid-area: name;
+  }
+
+  .tracker-col-network {
+    grid-area: network;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 0.45rem;
+    min-width: 0;
+  }
+
+  .tracker-col-domain {
+    width: auto;
+    max-width: min(100%, 13rem);
+    padding-right: 0;
+    flex: 0 1 auto;
+  }
+
+  .tracker-col-ip {
+    width: auto;
+    text-align: left;
+    flex: 0 0 auto;
+  }
+
+  .tracker-col-switch {
+    grid-area: toggle;
+    justify-self: end;
+  }
+
+  .tracker-col-actions {
+    grid-area: actions;
   }
 }
 
@@ -2047,9 +2098,9 @@ const handleDeleteWhitelistDomain = async (domain: string) => {
   }
 
   .tracker-table {
-    border-radius: 0;
-    border-left: none;
-    border-right: none;
+    border-radius: 1rem;
+    border-left: 1px solid rgba(161, 172, 184, 0.12);
+    border-right: 1px solid rgba(161, 172, 184, 0.12);
   }
 
   .tracker-table-header {
@@ -2060,7 +2111,7 @@ const handleDeleteWhitelistDomain = async (domain: string) => {
     grid-template-columns: minmax(0, 1fr) auto;
     grid-template-areas:
       "name toggle"
-      "domain ip"
+      "network network"
       "actions actions";
     gap: 0.8rem;
     padding: 1rem 0.2rem;
@@ -2070,17 +2121,26 @@ const handleDeleteWhitelistDomain = async (domain: string) => {
     grid-area: name;
   }
 
+  .tracker-col-network {
+    grid-area: network;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 0.45rem;
+    min-width: 0;
+  }
+
   .tracker-col-domain {
-    grid-area: domain;
-    width: 100%;
-    padding-right: 0.5rem;
+    width: auto;
+    max-width: min(100%, 13rem);
+    padding-right: 0;
+    flex: 0 1 auto;
   }
 
   .tracker-col-ip {
-    grid-area: ip;
     width: auto;
-    justify-self: start;
     text-align: left;
+    flex: 0 0 auto;
   }
 
   .tracker-col-switch {
