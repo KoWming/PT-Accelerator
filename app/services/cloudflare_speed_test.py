@@ -104,6 +104,14 @@ class CloudflareSpeedTestService:
         cmd.extend(["-o", result_out])
         cmd.extend(["-f", ip_src])
 
+        # 默认附加 "-dd" (关闭下载测速) 和 "-p 0" (不显示控制台结果列表) 
+        # 以还原原版 Shell 脚本的高速执行体验。若用户自定义中已提供类似的参数，则不重复添加。
+        args_str = additional_args if additional_args else ""
+        if "-dd" not in args_str:
+            cmd.append("-dd")
+        if "-p" not in args_str:
+            cmd.extend(["-p", "0"])
+
         if additional_args:
             for arg in additional_args.split():
                 if arg.strip() and arg.strip() != "-ipv4":
@@ -112,26 +120,33 @@ class CloudflareSpeedTestService:
         logger.info(f"{tag} 执行命令: {' '.join(cmd)}")
         logs: list = []
         try:
-            process = subprocess.Popen(
+            # 引入 5 分钟超时，防止由于没有有效 IPv6 路由导致的 TCP Connect 无限挂起
+            process = subprocess.run(
                 cmd,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
                 cwd=self.base_dir,
+                timeout=300
             )
-            while True:
-                line = process.stdout.readline()
-                if line == "" and process.poll() is not None:
-                    break
-                if line:
-                    log_line = f"{tag} {line.strip()}"
-                    logger.info(log_line)
-                    logs.append(log_line)
-            stderr = process.stderr.read()
-            if stderr:
-                logger.error(f"{tag} 执行错误: {stderr}")
-                logs.append(f"错误: {stderr}")
-            return {"success": process.returncode == 0, "logs": logs}
+            
+            # 由于 cfst 会使用 \r 刷新进度条，按行获取输出极其冗长且易死锁
+            # 我们仅保留错误输出和关键结果，以保持日志整洁
+            if process.stderr:
+                logger.error(f"{tag} 测速输出警告/错误: {process.stderr.strip()}")
+                logs.append(f"错误: {process.stderr.strip()}")
+                
+            if process.returncode == 0:
+                logger.info(f"{tag} 测速正常完成 (返回码: 0)")
+                return {"success": True, "logs": logs}
+            else:
+                logger.warning(f"{tag} 测速退出异常 (返回码: {process.returncode})")
+                return {"success": False, "logs": logs}
+                
+        except subprocess.TimeoutExpired:
+            logger.error(f"{tag} 进程执行超时 (超过 300 秒)，已强制终止。可能原因：网络无路由导致 TCP Connect 挂起，或下载测速节点过多。")
+            logs.append("错误: 进程执行超时已被系统终止")
+            return {"success": False, "logs": logs}
         except Exception as exc:
             logger.error(f"{tag} 进程异常: {exc}")
             return {"success": False, "logs": [f"错误: {exc}"]}
