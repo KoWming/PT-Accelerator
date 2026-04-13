@@ -101,8 +101,6 @@ class CloudflareSpeedTestService:
             return {"success": False, "logs": [msg]}
 
         cmd = [self.cft_path]
-        if use_ipv6:
-            cmd.append("-ipv6")
         cmd.extend(["-o", result_out])
         cmd.extend(["-f", ip_src])
 
