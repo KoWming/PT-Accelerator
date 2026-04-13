@@ -104,13 +104,16 @@ class CloudflareSpeedTestService:
         cmd.extend(["-o", result_out])
         cmd.extend(["-f", ip_src])
 
-        # 默认附加 "-dd" (关闭下载测速) 和 "-p 0" (不显示控制台结果列表) 
+        # 默认附加 "-dd" (关闭下载测速)、 "-p 0" (静默输出)、 "-n 500" (增加并发线程以对抗 IPv6 海量寻址超时)
         # 以还原原版 Shell 脚本的高速执行体验。若用户自定义中已提供类似的参数，则不重复添加。
         args_str = additional_args if additional_args else ""
         if "-dd" not in args_str:
             cmd.append("-dd")
         if "-p" not in args_str:
             cmd.extend(["-p", "0"])
+        # 如果用户没有自定义测速线程，我们激进地拉高到 500 以对抗 IPv6 海量扫描
+        if "-n" not in args_str:
+            cmd.extend(["-n", "500"])
 
         if additional_args:
             for arg in additional_args.split():
@@ -120,14 +123,14 @@ class CloudflareSpeedTestService:
         logger.info(f"{tag} 执行命令: {' '.join(cmd)}")
         logs: list = []
         try:
-            # 引入 5 分钟超时，防止由于没有有效 IPv6 路由导致的 TCP Connect 无限挂起
+            # 放宽至 10 分钟超时，因为 IPv6 地址库过大，在遇到大量未分配地址时 TCP Connect 会消耗极长时间
             process = subprocess.run(
                 cmd,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
                 cwd=self.base_dir,
-                timeout=300
+                timeout=600
             )
             
             # 由于 cfst 会使用 \r 刷新进度条，按行获取输出极其冗长且易死锁
@@ -157,30 +160,41 @@ class CloudflareSpeedTestService:
     def _parse_best_from_csv(self, csv_path: str) -> tuple:
         """从 result CSV 中解析出最优 IP 和对应下载速度，返回 (ip, speed)；找不到返回 (None, 0)"""
         if not os.path.exists(csv_path):
-            return None, 0
+            return None, 0.0
         try:
-            with open(csv_path, "r") as f:
+            with open(csv_path, "r", encoding="utf-8") as f:
                 lines = f.readlines()
+            
+            # 如果只有表头或为空，代表没有有效结果
             if len(lines) <= 1:
-                return None, 0
+                return None, 0.0
+                
+            # CFST 已经极其聪明地帮我们把最优节点排在了第一位
+            # 开启了速度测试就按速度排，开启了 -dd 就按延迟排
+            # 所以不论什么情况，我们直接拿数据的第一行（lines[1]）就是唯一的真理
+            best_row = lines[1].strip().split(",")
+            best_ip = best_row[0].strip()
+            
+            # 为了获取一下展示用的速度，我们稍微找一下速度在哪一列（大概率是第5列）
             headers = lines[0].strip().split(",")
-            ip_idx = headers.index("IP")
-            spd_idx = headers.index("下载速度 (MB/s)")
-            best_ip, best_speed = None, 0.0
-            for row in lines[1:]:
-                cols = row.strip().split(",")
-                if len(cols) > max(ip_idx, spd_idx):
-                    try:
-                        speed = float(cols[spd_idx])
-                        if speed > best_speed:
-                            best_speed = speed
-                            best_ip = cols[ip_idx]
-                    except ValueError:
-                        continue
+            spd_idx = 5
+            for i, h in enumerate(headers):
+                if "speed" in h.lower() or "速度" in h:
+                    spd_idx = i
+                    break
+                    
+            best_speed = 0.0
+            if len(best_row) > spd_idx:
+                try:
+                    best_speed = float(best_row[spd_idx])
+                except ValueError:
+                    pass
+                    
             return best_ip, best_speed
+            
         except Exception as e:
             logger.error(f"解析结果文件出错 {csv_path}: {e}")
-            return None, 0
+            return None, 0.0
 
     def _apply_best_ip(self, best_ip: str, best_speed: float):
         """将最优 IP 写入所有启用的 Tracker"""
