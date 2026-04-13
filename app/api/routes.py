@@ -53,9 +53,20 @@ def _send_task_notify(title: str, content: str):
             status_emoji = "❌"
 
         # 3) 统一美化内容：状态 + 原始信息 + 时间
+        if title not in title_map:
+            pretty_title = f"{status_emoji} {title}"
+            
+        pretty_title = f"【{pretty_title}】"
+            
+        separator = "──────────"
+        # 剥离多余的前后缀空白，确保横线贴紧
+        text = text.strip()
+        
         pretty_content = (
-            f"{status_emoji} {text}\n\n"
-            f"🕒 {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+            f"{separator}\n"
+            f"{text}\n"
+            f"{separator}\n"
+            f"⏰ 推送时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
         )
 
         cfg = get_config() or {}
@@ -1213,9 +1224,17 @@ async def save_notify_config(payload: Dict[str, Any]):
 async def test_notify(payload: Dict[str, Any]):
     """测试发送通知：可携带title/content与临时覆盖的channels"""
     try:
-        title = payload.get("title") or "通知测试"
-        content = payload.get("content") or "这是一条测试消息"
+        base_title = payload.get("title") or "通知测试"
+        base_content = payload.get("content") or "这是一条测试消息"
         channels_override = payload.get("channels") or {}
+        
+        title = f"【🔔 {base_title}】" if " " not in base_title else f"【{base_title}】"
+        content = (
+            "──────────\n"
+            f"{base_content}\n"
+            "──────────\n"
+            f"⏰ 推送时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+        )
 
         # 读取配置
         config = get_config()
@@ -1527,8 +1546,15 @@ async def test_notify_channel(
         channel_config = channels[channel_key]
         
         # 构造测试消息
-        title = "🔔 PT-Accelerator测试通知："
-        content = f"这是一条来自 【{channel_config.get('name', channel_key)}】通知渠道 的测试消息！\n发送时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+        channel_name = channel_config.get('name', channel_key)
+        title = "【🔔 PT-Accelerator 测试通知】"
+        content = (
+            "──────────\n"
+            f"这是一条来自 【{channel_name}】通知渠道 的测试消息！\n"
+            "如果您收到此消息，说明该渠道的通知功能已配置成功！\n"
+            "──────────\n"
+            f"⏰ 推送时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+        )
         
         # 展平配置 (参考 _send_task_notify)
         flat_config = {}

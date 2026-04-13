@@ -1,4 +1,4 @@
-# PT-Accelerator v2.2.1
+# PT-Accelerator v2.2.3
 
 一个面向PT站点用户的全自动加速与管理平台，采用 **Vue 3 + FastAPI** 前后端分离架构。集成Cloudflare IP优选、PT Tracker批量管理、GitHub/TMDB等站点加速、下载器一键导入、Web可视化配置等多种功能，支持Docker一键部署，适合所有对网络加速和PT站点体验有高要求的用户。
 
@@ -7,6 +7,7 @@
 ## 功能亮点
 
 - **Cloudflare IP优选**：集成CloudflareSpeedTest，自动定时优选全球最快Cloudflare IP，极大提升PT站点和GitHub等访问速度。
+- **IPv6双栈并行优选**：支持同时测速 IPv4/IPv6，自动写入双条 Hosts 记录，操作系统根据 RFC 6724 自动选择最优协议。
 - **架构自适应支持**：完美支持AMD64和ARM64架构，自动检测并选择对应的CloudflareSpeedTest可执行文件和配置文件。
 - **PT Tracker批量管理**：支持批量添加、批量清空、批量导入、单个删除、状态切换等操作，Tracker管理极致高效。
 - **下载器一键导入**：支持qBittorrent、Transmission等主流下载器，自动导入Tracker列表并智能筛选Cloudflare站点。
@@ -17,12 +18,7 @@
 - **一键清空/重建**：支持一键清空所有Tracker、清空并重建hosts文件，彻底解决历史污染和遗留问题。
 - **日志与状态监控**：内置系统日志、任务进度、调度器状态等实时监控，方便排查和优化。
 - **多架构Docker镜像**：提供AMD64和ARM64架构的Docker镜像，支持树莓派、ARM服务器等设备。
-- **CI/CD自动化**：集成GitHub Actions，支持自动构建和手动自定义版本发布。
 - **多通知渠道**：支持多种通知方式，及时获取系统状态和任务完成通知。
-- **Hosts文件编辑**：支持在线编辑Hosts文件，实时预览和保存修改。
-- **日志管理**：支持清空日志功能，保持系统日志整洁。
-- **移动端适配**：完美适配移动端显示，支持手机和平板设备访问。
-- **Hosts结构保护**：修复清空Hosts功能，保护系统原有Hosts文件头结构。
 - **极致兼容性**：支持Docker、原生Python环境，支持Linux/Windows/Mac，适配多种部署场景。
 
 ---
@@ -44,16 +40,6 @@ docker run -d \
   -v /path/to/logs:/app/logs \
   -e TZ=Asia/Shanghai \
   kowming/pt-accelerator:latest-dev
-
-# 指定架构（ARM64架构）
-docker run -d \
-  --name pt-accelerator \
-  --network host \
-  -v /etc/hosts:/etc/hosts \
-  -v /path/to/config:/app/config \
-  -v /path/to/logs:/app/logs \
-  -e TZ=Asia/Shanghai \
-  kowming/pt-accelerator:arm64
 ```
 
 或使用`docker-compose.yml`：
@@ -61,7 +47,7 @@ docker run -d \
 ```yaml
 services:
   pt-accelerator:
-    image: kowming/pt-accelerator:latest
+    image: kowming/pt-accelerator:latest-dev
 #    image: eternalcurse/pt-accelerator:latest
     container_name: pt-accelerator
     restart: unless-stopped
@@ -159,160 +145,51 @@ bash start.sh
 ## 主要功能模块
 
 ### 1. 控制面板
-- 查看调度器状态、定时任务、快速运行IP优选与Hosts更新
-- 一键仅更新Hosts
-- 一键清空Hosts并重建（彻底清理历史污染，保护系统原有结构）
-- 监控IP优选和Hosts更新任务进度
-- 支持移动端响应式显示，完美适配手机和平板设备
+- 查看调度器状态、定时任务列表，一键触发 IP 优选与 Hosts 更新
+- 支持开启 **IPv6 优选**：并行测速双栈，自动写入两条 Hosts 记录
+- 一键仅更新 Hosts（沿用上次优选 IP，不重新测速）
+- 一键清空并重建（仅移除项目写入分区，系统原有内容不受影响）
+- 配置 CRON 定时任务，保存后立即生效
 
-### 2. Tracker管理
+### 2. Tracker 管理
 - 批量添加、批量清空、单个删除、状态切换
-- 一键导入下载器Tracker（自动筛选Cloudflare站点）
-- 支持Cloudflare白名单管理
-- Tracker IP一键批量更新
-- 支持大量PT站点Tracker自动配置
+- 一键从下载器导入 Tracker（自动筛选 Cloudflare 站点）
+- Cloudflare 白名单管理、Tracker IP 一键批量更新
 
-### 3. Hosts源管理
-- 支持多条外部Hosts源，自动合并、去重、优选
-- 支持添加、删除、启用/禁用Hosts源
-- 内置多个优质Hosts源（GitHub和TMDB加速）
-- 自动定时更新所有Hosts源
+### 3. Hosts 源管理
+- 多条外部 Hosts 源自动合并、去重、优选（延迟最低原则）
+- 支持添加、删除、启用/禁用 Hosts 源
+- 内置 GitHub/TMDB 加速 Hosts 源，自动定时更新
 
 ### 4. 下载器管理
-- 支持添加和管理**多个**qBittorrent、Transmission等主流下载器实例，每个实例均可独立配置。
-- 一键测试连接、保存配置、导入Tracker
-- 支持端口、用户名密码、HTTPS等完整配置
-- 自动验证连接有效性
+- 支持多个 qBittorrent / Transmission 实例，各自独立配置
+- 一键测试连接、保存配置、导入 Tracker
+- 支持 HTTPS、端口、用户名密码等完整配置
 
 ### 5. 日志与监控
-- 实时查看系统日志、操作日志、任务进度
-- 支持刷新、自动滚动
-- 记录所有关键操作和错误信息
-- 支持一键清空日志功能，保持系统整洁
+- 实时查看系统日志、任务进度，支持自动滚动与一键清空
 
-### 6. Hosts文件管理
-- 支持在线编辑Hosts文件，实时预览修改效果
-- 保护系统原有Hosts文件头结构，避免破坏系统配置
-- 智能合并多个Hosts源，自动去重和优化
+### 6. Hosts 文件管理
+- 在线编辑 Hosts 文件，实时预览、保存，保护系统原有结构
 
 ### 7. 通知系统
-- 支持多种通知渠道，及时获取系统状态
-- 任务完成通知、错误告警通知
-- 可选配置通知方式
-- **支持渠道**：
-  - Telegram Bot
-  - 企业微信 (应用/Bot)
-  - SMTP 邮件
-  - Bark (iOS)
-  - WxPusher
-  - Gotify
-  - MediaSaber
-  - Webhook
+- 统一格式推送（`【标题】` + emoji + 分隔符），支持一言日报尾缀
+- **支持渠道**：Telegram、企业微信、SMTP、Bark、WxPusher、Gotify、MediaSaber、Webhook
 
 ### 8. 备份与恢复
-- **WebDAV支持**：支持将配置文件自动备份到WebDAV服务器（如坚果云、Nextcloud等）。
-- **定时备份**：每次修改配置或定时任务触发时自动备份。
-- **一键恢复**：支持从云端备份列表选择并一键恢复配置，防止数据丢失。
-- **版本控制**：支持设置保留备份数量，自动清理旧备份。
-
----
-
-## 配置文件说明（config/config.yaml）
-
-- `auth`：用户认证配置 (新增)
-  - `enable`：是否启用用户认证 (例如 `true` 或 `false`)
-  - `username`：登录用户名
-  - `password`：登录密码 (建议存储哈希后的密码，具体请参照您的实现方式)
-
-- `cloudflare`：Cloudflare优选相关配置
-  - `enable`：是否启用Cloudflare IP优选
-  - `cron`：定时任务Cron表达式（默认每天0点）
-  - `ipv6`：是否启用IPv6测速
-  - `additional_args`：CloudflareST额外参数
-  - `notify`：是否开启通知
-  
-- `cloudflare_domains`：Cloudflare白名单域名列表（需要优化的域名）
-
-- `hosts_sources`：外部Hosts源列表
-  - `name`：源名称
-  - `url`：源URL地址
-  - `enable`：是否启用
-
-- `torrent_clients`：下载器配置列表 (支持多个实例)
-  - 每个下载器实例为一个列表项，包含以下字段：
-    - `name`: (必填) 用户为此下载器实例设定的唯一名称 (例如 `qb-main`, `tr-backup`)
-    - `type`: (必填) 下载器类型，可选值为 `qbittorrent` 或 `transmission`
-    - `host`：下载器主机地址
-    - `port`：下载器端口
-    - `username`/`password`：登录凭据
-    - `use_https`：是否使用HTTPS (例如 `true` 或 `false`)
-    - `enable`：是否启用此下载器实例 (例如 `true` 或 `false`)
-  - 示例:
-    ```yaml
-    torrent_clients:
-      - name: qBittorrent主服务器
-        type: qbittorrent
-        host: localhost
-        port: 8080
-        username: admin
-        password: adminadmin
-        use_https: false
-        version: 
-        enable: true
-      - name: Transmission备用
-        type: transmission
-        host: 192.168.1.100
-        port: 9091
-        username: 
-        password: 
-        use_https: false
-        version: 
-        enable: true
-    ```
-
-- `trackers`：PT站点Tracker列表
-  - `name`：Tracker名称
-  - `domain`：Tracker域名
-  - `ip`：优选的IP地址
-  - `enable`：是否启用
-  
-- `backup`：备份配置 (新增)
-  - `enable`：是否启用自动备份
-  - `webdav_url`：WebDAV服务器地址 (例如 `https://dav.jianguoyun.com/dav/backup/`)
-  - `webdav_username`：WebDAV用户名
-  - `webdav_password`：WebDAV密码/应用密码
-  - `backup_count`：保留备份文件数量 (默认5)
-
-- `notify`：通知配置
-  - `channels`：多通道配置列表 (支持 Telegram, WeCom, SMTP, Bark, WxPusher, Gotify, MediaSaber, Webhook)
-  - 示例：
-    ```yaml
-    notify:
-      channels:
-        my_telegram:
-          type: telegram
-          enable: true
-          TG_BOT_TOKEN: "123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11"
-          TG_USER_ID: "123456789"
-        my_bark:
-          type: bark
-          enable: true
-          BARK_PUSH: "https://api.day.app/your_key/"
-    ```
-
-**所有配置均可通过Web界面实时修改，无需手动编辑。**
+- WebDAV 自动备份（坚果云、Nextcloud 等），支持一键恢复、版本控制
 
 ---
 
 ## CloudflareSpeedTest说明
 
 - 已内置CloudflareST二进制和测速脚本，自动调用，无需手动操作
+- **双栈并行优选**：开启 IPv6 后同时启动两个进程分别测速，双条写入 Hosts，系统自动选择最优协议
 - **架构自适应**：自动检测系统架构（AMD64/ARM64），选择对应的可执行文件和配置文件
 - 相关参数和测速数据文件（ip.txt/ipv6.txt）可在对应架构目录下自定义：
   - AMD64架构：`cfst_linux_amd64/` 目录
   - ARM64架构：`cfst_linux_arm64/` 目录
 - 自动筛选延迟低、速度快的优质CF节点IP
-- 支持IPv4/IPv6双协议测速
 - Docker构建时自动排除不需要的架构文件，优化镜像大小
 - 参考：https://github.com/XIU2/CloudflareSpeedTest
 
@@ -320,58 +197,26 @@ bash start.sh
 
 ## 常见问题
 
-- **Q: 为什么要挂载/etc/hosts？**  
-  A: 程序会自动优化和重写系统hosts文件，提升全局访问速度，必须有写入权限。
+- **Q: 为什么要挂载 `/etc/hosts`？**  
+  A: 程序需要写入系统 hosts 文件以生效。使用 Docker 的下载器（如 qBittorrent）也需单独挂载 `-v /etc/hosts:/etc/hosts:ro`，容器不会自动使用宿主机 hosts。
 
-- **Q: 如何彻底清空tracker或hosts？**  
-  A: Web界面提供"一键清空所有tracker""清空hosts并重建"按钮，安全高效。
+- **Q: 支持哪些 PT 站点？**  
+  A: 支持所有基于 Cloudflare CDN 的 PT 站点，非 Cloudflare 站点会自动过滤，不写入 hosts。
 
-- **Q: 支持哪些PT站点？**  
-  A: 支持所有基于Cloudflare的PT站点，非Cloudflare站点会自动过滤。
+- **Q: 开启 IPv6 优选有什么效果？**  
+  A: 开启后并行测速 IPv4 和 IPv6，将两条地址同时写入 hosts，操作系统自动选择最优协议。若网络不支持 IPv6 则自动降级为仅写入 IPv4。
+
+- **Q: 清空 Hosts 会破坏系统配置吗？**  
+  A: 不会。系统只移除本项目写入的分区，保留原有 hosts 内容完整无损。
 
 - **Q: 日志和配置如何持久化？**  
-  A: 建议挂载`/app/config`和`/app/logs`到本地目录，防止容器重启丢失数据。
+  A: 挂载 `/app/config` 和 `/app/logs` 到本地目录，防止容器重启后数据丢失。
 
-- **Q: 如果系统使用了代理，会影响IP测速吗？**  
-  A: 会影响。建议在测速时临时关闭系统代理，确保获得准确的测速结果。
+- **Q: 如何更新到最新版本？**  
+  A: 执行 `docker pull kowming/pt-accelerator:latest-dev` 后重新创建容器即可，Docker 会自动选择对应架构（AMD64/ARM64）的镜像。
 
-- **Q: 项目如何更新？**  
-  A: 使用Docker部署的用户可以通过`docker pull kowming/pt-accelerator:latest`拉取最新镜像，再重新创建容器。
-
-- **Q: 支持哪些架构？**  
-  A: 支持AMD64和ARM64架构，包括x86_64服务器、树莓派、ARM服务器等。Docker会自动选择对应架构的镜像。
-
-- **Q: 如何在树莓派上运行？**  
-  A: 树莓派使用ARM64架构，直接使用`docker pull kowming/pt-accelerator:latest`即可，Docker会自动选择ARM64版本。
-
-- **Q: 如何手动构建特定版本的镜像？**  
-  A: 在GitHub Actions页面可以手动触发构建，并自定义版本号（如v1.0.0-hotfix），支持紧急修复版本发布。
-
-- **Q: 支持哪些通知方式？**  
-  A: 支持多种通知渠道，包括系统内置通知、邮件通知等，可在配置中设置通知方式和频率。
-
-- **Q: 如何在线编辑Hosts文件？**  
-  A: 在Web界面的Hosts管理模块中，可以直接编辑Hosts文件内容，支持实时预览和保存修改。
-
-- **Q: 清空Hosts会破坏系统配置吗？**  
-  A: 不会。系统会保护原有的Hosts文件头结构，只清理PT-Accelerator添加的内容，确保系统配置完整。
-
-- **Q: 支持手机访问吗？**  
-  A: 完全支持。Web界面已完美适配移动端，支持手机和平板设备访问，提供良好的移动端体验。
-
-- **Q: 如何让Docker容器化的下载器（如qBittorrent）使用优化后的hosts？**  
-  A: 在下载器的Docker配置中，添加挂载`/etc/hosts:/etc/hosts:ro`（只读模式），示例：
-  ```yaml
-  services:
-    qbittorrent:
-      image: linuxserver/qbittorrent
-      # ... 其他配置 ...
-      volumes:
-        - /etc/hosts:/etc/hosts:ro  # 挂载hosts文件为只读
-        - ./config:/config
-        - ./downloads:/downloads
-  ```
-  注意：无论使用什么网络模式（host、bridge等），都需要显式挂载hosts文件，容器不会自动使用宿主机的hosts文件。当PT-Accelerator更新宿主机hosts文件时，容器内的hosts文件也会自动同步更新。
+- **Q: 系统代理会影响 IP 测速吗？**  
+  A: 会影响。建议测速时临时关闭系统代理，以获得准确的延迟与速度数据。
 
 ---
 
@@ -406,14 +251,19 @@ bash start.sh
 
 ## 版本更新日志
 
-### 最新版本 (v2.2.1)
+### 最新版本 (v2.2.3)
 
-- ✅ **UI 全面重构**：对整体界面进行全面视觉与交互重构，带来更现代、更流畅的使用体验。
-- ✅ **视觉设计升级**：优化色彩体系、组件风格与布局层次，大幅提升界面美观度与一致性。
-- ✅ **交互体验优化**：细化各页面操作反馈、动效与响应式适配，全面改善用户操作体验。
+- ✅ **IPv6 双栈并行优选**：支持 IPv4/IPv6 双协议并行测速，自动写入双条 Hosts 记录，系统自动选择最优协议。
+- ✅ **消息推送优化**：统一推送格式（`【标题】` + 分隔符 + emoji），提升移动端可读性。
+- ✅ **修复一言拦截**：为一言 API 请求添加 `Accept-Language` 及 `User-Agent` 标头，解决第三方接口拦截问题。
+- ✅ **前端性能优化**：消除开关按钮首屏闪烁，引入 localStorage 缓存策略，实现 0 延迟状态恢复。
+- ✅ **图标库本地化**：将 Boxicons 从外部 CDN 改为本地导入，消除网络依赖导致的图标闪现。
+- ✅ **IPv6 socket 修复**：修复 `_ping_ip` 中 socket 类型硬编码为 IPv4 的错误，支持 IPv6 连通性检测。
 
 ### 版本历史
 
+- **v2.2.3** (2026-04-13) - IPv6双栈并行优选、消息推送格式统一、一言拦截修复、前端闪烁消除、图标库本地化、IPv6 socket 修复
+- **v2.2.2** (2026-04-10) - 修复已禁用 Hosts 源被兜底复活的问题；强化禁用源黑名单过滤、历史记录隔离及兜底拦截逻辑
 - **v2.2.1** (2026-03-29) - UI细节优化
 - **v2.2.0** (2026-03-27) - UI 全面重构，优化视觉设计与交互体验
 - **v2.1.0** (2026-02-26) - 修复批量更新IP确定按钮悬停样式、Trackers列表支持多字段点击排序、增强批量添加提示与稳定性
@@ -427,14 +277,6 @@ bash start.sh
 - **v2.0.1** (2025-10-11) - 修复自定义通知配置问题
 - **v2.0.0** (2025-09-25) - 架构自适应支持、多通知渠道、移动端适配、Hosts结构保护
 - **v1.0.0** (2025-04-29) - 初始版本发布
-
-### 主要功能
-
-- ✅ **Cloudflare IP优选**：自动定时优选全球最快Cloudflare IP
-- ✅ **PT Tracker管理**：批量管理PT站点Tracker
-- ✅ **下载器集成**：支持qBittorrent、Transmission等主流下载器
-- ✅ **Hosts源管理**：多路合并GitHub/TMDB等Hosts源
-- ✅ **Web界面**：现代化Web界面，支持实时配置和监控
 
 ---
 

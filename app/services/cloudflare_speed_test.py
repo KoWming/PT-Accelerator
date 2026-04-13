@@ -27,6 +27,8 @@ class CloudflareSpeedTestService:
         
         # 结果和IP文件路径
         self.result_file = os.path.join(self.base_dir, "result.csv")
+        self.result_v4_file = os.path.join(self.base_dir, "result_v4.csv")
+        self.result_v6_file = os.path.join(self.base_dir, "result_v6.csv")
         self.ip_file = os.path.join(self.base_dir, "ip.txt")
         self.ipv6_file = os.path.join(self.base_dir, "ipv6.txt")
         
@@ -84,6 +86,105 @@ class CloudflareSpeedTestService:
     def update_config(self, config: Dict[str, Any]):
         """更新配置"""
         self.config = config
+
+    # ─────────────────────────────────────────────
+    # 核心：单次进程执行
+    # ─────────────────────────────────────────────
+    def _run_cfst_process(self, use_ipv6: bool, result_out: str, additional_args: str = "") -> Dict[str, Any]:
+        """启动一个 CloudflareST 子进程并等待它完成，返回 {success, logs}"""
+        tag = "[IPv6]" if use_ipv6 else "[IPv4]"
+        ip_src = self.ipv6_file if use_ipv6 else self.ip_file
+
+        if not os.path.exists(ip_src):
+            msg = f"{tag} IP文件不存在: {ip_src}"
+            logger.error(msg)
+            return {"success": False, "logs": [msg]}
+
+        cmd = [self.cft_path]
+        if use_ipv6:
+            cmd.append("-ipv6")
+        cmd.extend(["-o", result_out])
+        cmd.extend(["-f", ip_src])
+
+        if additional_args:
+            for arg in additional_args.split():
+                if arg.strip() and arg.strip() != "-ipv4":
+                    cmd.append(arg.strip())
+
+        logger.info(f"{tag} 执行命令: {' '.join(cmd)}")
+        logs: list = []
+        try:
+            process = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                cwd=self.base_dir,
+            )
+            while True:
+                line = process.stdout.readline()
+                if line == "" and process.poll() is not None:
+                    break
+                if line:
+                    log_line = f"{tag} {line.strip()}"
+                    logger.info(log_line)
+                    logs.append(log_line)
+            stderr = process.stderr.read()
+            if stderr:
+                logger.error(f"{tag} 执行错误: {stderr}")
+                logs.append(f"错误: {stderr}")
+            return {"success": process.returncode == 0, "logs": logs}
+        except Exception as exc:
+            logger.error(f"{tag} 进程异常: {exc}")
+            return {"success": False, "logs": [f"错误: {exc}"]}
+
+    # ─────────────────────────────────────────────
+    # 结果解析
+    # ─────────────────────────────────────────────
+    def _parse_best_from_csv(self, csv_path: str) -> tuple:
+        """从 result CSV 中解析出最优 IP 和对应下载速度，返回 (ip, speed)；找不到返回 (None, 0)"""
+        if not os.path.exists(csv_path):
+            return None, 0
+        try:
+            with open(csv_path, "r") as f:
+                lines = f.readlines()
+            if len(lines) <= 1:
+                return None, 0
+            headers = lines[0].strip().split(",")
+            ip_idx = headers.index("IP")
+            spd_idx = headers.index("下载速度 (MB/s)")
+            best_ip, best_speed = None, 0.0
+            for row in lines[1:]:
+                cols = row.strip().split(",")
+                if len(cols) > max(ip_idx, spd_idx):
+                    try:
+                        speed = float(cols[spd_idx])
+                        if speed > best_speed:
+                            best_speed = speed
+                            best_ip = cols[ip_idx]
+                    except ValueError:
+                        continue
+            return best_ip, best_speed
+        except Exception as e:
+            logger.error(f"解析结果文件出错 {csv_path}: {e}")
+            return None, 0
+
+    def _apply_best_ip(self, best_ip: str, best_speed: float):
+        """将最优 IP 写入所有启用的 Tracker"""
+        logger.info(f"[优选结果] 最优IP: {best_ip}，速度: {best_speed:.2f} MB/s")
+        for tracker in self.config.get("trackers", []):
+            if tracker.get("enable", False):
+                domain = tracker.get("domain")
+                if domain:
+                    logger.info(f"为 {domain} 设置新IP: {best_ip}")
+                    self.hosts_manager.add_cloudflare_ip(domain, best_ip)
+
+    def _apply_dual_stack_ips(self, ipv4: str, ipv6: str):
+        """双栈写入：将 IPv4 + IPv6 同时写入所有启用的 Tracker"""
+        logger.info(f"[双栈写入] IPv4={ipv4}  IPv6={ipv6}")
+        # 先批量设置配置中的 ip/ip6 字段
+        self.hosts_manager._update_all_trackers_dual_stack(ipv4, ipv6)
+        # _update_all_trackers_dual_stack 内部已调用 update_hosts()，无需重复调用
     
     def _get_arch_dir(self) -> str:
         """获取当前架构对应的目录名"""
@@ -255,181 +356,105 @@ class CloudflareSpeedTestService:
             logger.error(f"创建IPv6文件失败: {str(e)}")
     
     def run(self):
-        """运行CloudflareSpeedTest"""
+        """运行CloudflareSpeedTest（支持并行双栈优选）"""
         if self.running:
             logger.warning("CloudflareSpeedTest已在运行中，跳过本次执行")
             return False
-        
+
         try:
             self.running = True
-            logger.info("开始运行CloudflareSpeedTest...")
-            
-            # 确保IP文件存在
-            self._ensure_ip_files()
-            
-            # 验证文件和可执行文件是否存在
-            if not os.path.exists(self.cft_path):
-                logger.error(f"CloudflareSpeedTest可执行文件不存在: {self.cft_path}")
-                return {
-                    "success": False,
-                    "logs": [f"错误: CloudflareSpeedTest可执行文件不存在: {self.cft_path}"]
-                }
-            
-            if not os.path.exists(self.ip_file):
-                logger.error(f"IP文件不存在: {self.ip_file}")
-                return {
-                    "success": False,
-                    "logs": [f"错误: IP文件不存在: {self.ip_file}"]
-                }
-            
-            # 列出目录内容，便于调试
-            logger.info(f"当前目录文件列表: {', '.join(os.listdir(self.base_dir))}")
-            
-            # 构建命令行参数
-            cmd = [self.cft_path]
-            
-            # 添加配置中的参数
             cloudflare_config = self.config.get("cloudflare", {})
-            
-            # 注意：不要使用ipv4参数，CloudflareSpeedTest默认就是测试IPv4
-            # 只有需要IPv6时才添加-ipv6参数
-            if cloudflare_config.get("ipv6", False):
-                cmd.append("-ipv6")
-            
-            # 输出文件 - 使用绝对路径
-            cmd.extend(["-o", self.result_file])
-            
-            # 显式指定IP文件 - 使用绝对路径
-            cmd.extend(["-f", self.ip_file])
-            
-            # 其他参数
+            ipv6_enabled = cloudflare_config.get("ipv6", False)
             additional_args = cloudflare_config.get("additional_args", "")
-            if additional_args:
-                # 确保额外参数中不包含-ipv4
-                args_list = []
-                for arg in additional_args.split():
-                    if arg.strip() != "-ipv4":
-                        args_list.append(arg.strip())
-                if args_list:
-                    cmd.extend(args_list)
-            
-            # 设置工作目录
-            working_dir = self.base_dir
-            
-            # 运行命令
-            cmd_str = ' '.join(cmd)
-            logger.info(f"执行命令: {cmd_str}")
-            logger.info(f"工作目录: {working_dir}")
-            
-            # 将命令写入临时脚本文件，便于调试
-            script_path = os.path.join(self.base_dir, "cloudflare_test.sh")
-            with open(script_path, "w") as f:
-                f.write("#!/bin/bash\n")
-                f.write(f"cd {working_dir}\n")
-                f.write(f"{cmd_str}\n")
-            os.chmod(script_path, 0o755)
-            logger.info(f"已创建调试脚本: {script_path}")
-            
-            # 执行命令
-            process = subprocess.Popen(
-                cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-                cwd=working_dir  # 设置工作目录
-            )
-            
-            # 实时获取输出
-            logs = []
-            while True:
-                output = process.stdout.readline()
-                if output == '' and process.poll() is not None:
-                    break
-                if output:
-                    log_line = output.strip()
-                    logger.info(log_line)
-                    logs.append(log_line)
-            
-            # 获取错误信息
-            stderr = process.stderr.read()
-            if stderr:
-                logger.error(f"CloudflareSpeedTest执行错误: {stderr}")
-                logs.append(f"错误: {stderr}")
-            
-            # 检查结果
-            if os.path.exists(self.result_file):
-                # 处理结果
-                self._process_results()
-                logger.info("CloudflareSpeedTest执行完成")
+
+            logger.info(f"开始运行CloudflareSpeedTest（IPv6并行优选: {'启用' if ipv6_enabled else '关闭'}）")
+
+            # 确保可执行文件存在
+            if not os.path.exists(self.cft_path):
+                msg = f"CloudflareSpeedTest可执行文件不存在: {self.cft_path}"
+                logger.error(msg)
+                return {"success": False, "logs": [msg]}
+
+            # 确保IP文件就绪
+            self._ensure_ip_files()
+            if ipv6_enabled:
+                self._ensure_ipv6_file()
+
+            all_logs: list = []
+
+            if ipv6_enabled:
+                # ── 并行双栈模式 ──────────────────────────────
+                import concurrent.futures
+                logger.info("[双栈并行] 同时启动 IPv4 / IPv6 测速进程...")
+                with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+                    future_v4 = executor.submit(
+                        self._run_cfst_process, False, self.result_v4_file, additional_args
+                    )
+                    future_v6 = executor.submit(
+                        self._run_cfst_process, True, self.result_v6_file, additional_args
+                    )
+                    res_v4 = future_v4.result()
+                    res_v6 = future_v6.result()
+
+                all_logs.extend(res_v4.get("logs", []))
+                all_logs.extend(res_v6.get("logs", []))
+
+                # 解析两份结果，选最优
+                best_v4_ip, best_v4_speed = self._parse_best_from_csv(self.result_v4_file)
+                best_v6_ip, best_v6_speed = self._parse_best_from_csv(self.result_v6_file)
+
+                logger.info(f"[双栈对比] IPv4最优: {best_v4_ip} ({best_v4_speed:.2f} MB/s)  "
+                            f"IPv6最优: {best_v6_ip} ({best_v6_speed:.2f} MB/s)")
+
+                if best_v4_ip is None and best_v6_ip is None:
+                    logger.warning("[双栈并行] 两次测速均未获得有效结果")
+                    return {"success": False, "logs": all_logs}
+
+                if best_v4_ip and best_v6_ip:
+                    # 两种协议都有结果 → 双条并存
+                    logger.info(f"[双栈并存] IPv4={best_v4_ip}  IPv6={best_v6_ip}")
+                    self._apply_dual_stack_ips(best_v4_ip, best_v6_ip)
+                elif best_v4_ip:
+                    # 仅 IPv4 有效
+                    logger.info("[双栈并行] 仅 IPv4 有效，降级单条写入")
+                    self._apply_best_ip(best_v4_ip, best_v4_speed)
+                else:
+                    # 仅 IPv6 有效
+                    logger.info("[双栈并行] 仅 IPv6 有效，降级单条写入")
+                    self._apply_best_ip(best_v6_ip, best_v6_speed)
+
+                # 将胜出结果复制为标准 result.csv（供 get_last_result 展示）
+                winner_file = self.result_v6_file if (best_v6_speed > best_v4_speed and best_v6_ip) else self.result_v4_file
+                if os.path.exists(winner_file):
+                    import shutil as _shutil
+                    _shutil.copy2(winner_file, self.result_file)
+
+                return {"success": True, "logs": all_logs}
+
             else:
-                logger.error("CloudflareSpeedTest执行失败，未生成结果文件")
-            
-            return {
-                "success": process.returncode == 0,
-                "logs": logs
-            }
+                # ── 纯 IPv4 模式（原有行为）────────────────────
+                res = self._run_cfst_process(False, self.result_file, additional_args)
+                all_logs.extend(res.get("logs", []))
+                if os.path.exists(self.result_file):
+                    self._process_results()
+                    logger.info("CloudflareSpeedTest执行完成")
+                else:
+                    logger.error("CloudflareSpeedTest执行失败，未生成结果文件")
+                return {"success": res["success"], "logs": all_logs}
+
         except Exception as e:
-            logger.error(f"运行CloudflareSpeedTest出错: {str(e)}")
-            return {
-                "success": False,
-                "logs": [f"错误: {str(e)}"]
-            }
+            logger.error(f"运行CloudflareSpeedTest出错: {e}")
+            return {"success": False, "logs": [f"错误: {e}"]}
         finally:
             self.running = False
     
     def _process_results(self):
-        """处理测试结果"""
-        try:
-            if not os.path.exists(self.result_file):
-                logger.error("结果文件不存在")
-                return
-            
-            # 读取结果文件
-            with open(self.result_file, 'r') as f:
-                lines = f.readlines()
-            
-            if len(lines) <= 1:  # 只有标题行
-                logger.warning("结果文件中没有有效数据")
-                return
-            
-            # 解析标题行
-            headers = lines[0].strip().split(',')
-            
-            # 获取IP和速度列的索引
-            ip_index = headers.index("IP")
-            speed_index = headers.index("下载速度 (MB/s)")
-            
-            # 获取最快的IP
-            best_ip = None
-            best_speed = 0
-            
-            for i in range(1, len(lines)):
-                data = lines[i].strip().split(',')
-                if len(data) > max(ip_index, speed_index):
-                    ip = data[ip_index]
-                    try:
-                        speed = float(data[speed_index])
-                        if speed > best_speed:
-                            best_speed = speed
-                            best_ip = ip
-                    except ValueError:
-                        continue
-            
-            if best_ip:
-                logger.info(f"找到最优IP: {best_ip}，速度: {best_speed} MB/s")
-                
-                # 更新所有启用的Tracker
-                for tracker in self.config.get("trackers", []):
-                    if tracker.get("enable", False):
-                        domain = tracker.get("domain")
-                        if domain:
-                            logger.info(f"为 {domain} 设置新的IP: {best_ip}")
-                            self.hosts_manager.add_cloudflare_ip(domain, best_ip)
-            else:
-                logger.warning("未找到合适的IP")
-                
-        except Exception as e:
-            logger.error(f"处理结果出错: {str(e)}")
+        """处理 IPv4 单次测速结果（兼容旧路径）"""
+        best_ip, best_speed = self._parse_best_from_csv(self.result_file)
+        if best_ip:
+            self._apply_best_ip(best_ip, best_speed)
+        else:
+            logger.warning("未找到合适的IP")
     
     def get_last_result(self) -> Dict[str, Any]:
         """获取最后一次测试结果"""

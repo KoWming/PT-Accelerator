@@ -1125,9 +1125,15 @@ def one() -> str:
         "https://api.nxvav.cn/api/yiyan/",
     ]
 
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
+        "Accept": "application/json, text/plain, */*",
+        "Accept-Language": "zh-CN,zh;q=0.8,zh-TW;q=0.7"
+    }
+
     for url in urls:
         try:
-            response = requests.get(url, timeout=15)
+            response = requests.get(url, headers=headers, timeout=15)
             content = ""
             source = "网络"
 

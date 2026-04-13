@@ -136,6 +136,10 @@ class HostsManager:
                     # 直接写入，不再检测连通性
                     self.domain_ip_history[domain] = ip
                     entries.append(f"{ip}\t{domain}")
+                    # 双栈：若存在 ip6 字段，同时写入 IPv6 条目
+                    ip6 = tracker.get("ip6")
+                    if ip6:
+                        entries.append(f"{ip6}\t{domain}")
                 else:
                     non_cf_domains.append(domain)
             
@@ -231,7 +235,8 @@ class HostsManager:
         for retry in range(self.ping_retry_count):
             for port in ports:
                 try:
-                    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                    family = socket.AF_INET6 if ':' in ip else socket.AF_INET
+                    s = socket.socket(family, socket.SOCK_STREAM)
                     s.settimeout(timeout)
                     start = time.time()
                     s.connect((ip, port))
@@ -362,29 +367,49 @@ class HostsManager:
                             current_domains.add(domain)
                             entry_count += 1
                         logger.info(f"处理hosts源 {source_name} 的 {entry_count} 条记录完成，耗时 {time.time() - entry_process_start:.2f} 秒")
-            # 4. 处理历史IP记录作为兜底（只收集，不检测）
-            for domain, ip in self.domain_ip_history.items():
-                # 新增：跳过禁用tracker域名
-                if domain in tracker_domains or domain.strip().lower() in disabled_domains:
-                    continue
-                source_entries_map.setdefault("HistoryIPs", []).append(f"{ip}\t{domain}")
-                current_domains.add(domain)
-            # 4.5 智能兜底：对比备份，找出本次丢失的域名
+            # 提前收集禁用源的缓存域名，防止兜底复活
+            disabled_source_domains = set()
+            if self.config.get("hosts_sources"):
+                for source in self.config["hosts_sources"]:
+                    if not source.get("enable") and source.get("url"):
+                        cache_path = self._get_cache_path(source["url"])
+                        if os.path.exists(cache_path):
+                            try:
+                                with open(cache_path, 'r', encoding='utf-8') as f:
+                                    for line in f:
+                                        line = line.strip()
+                                        if not line or line.startswith('#'): continue
+                                        parts = line.split()
+                                        if len(parts) >= 2:
+                                            disabled_source_domains.add(parts[1])
+                            except Exception:
+                                pass
+
+            # 4.5 智能兜底：对比备份，找出本次因为网络异常丢失的域名
             lost_domains = backup_domains - current_domains
-            # 获取已禁用的tracker域名
-            disabled_domains = self._get_disabled_tracker_domains()
-            
             for lost_domain in lost_domains:
-                # 跳过已禁用的域名
                 if lost_domain.strip().lower() in disabled_domains:
                     logger.info(f"[兜底跳过] 域名 {lost_domain} 已被用户禁用，不参与兜底保留")
                     continue
-                lost_ip = merged_hosts_backup[lost_domain]
-                if self._dns_check(lost_domain, lost_ip):
+                if lost_domain in disabled_source_domains:
+                    logger.info(f"[兜底跳过] 域名 {lost_domain} 属于已被关闭的Hosts源，不参与兜底保留")
+                    continue
+                if not abnormal_sources:
+                    continue
+                lost_ip = merged_hosts_backup.get(lost_domain)
+                if lost_ip and self._dns_check(lost_domain, lost_ip):
                     source_entries_map.setdefault("LostHosts", []).append(f"{lost_ip}\t{lost_domain}")
                     logger.warning(f"[兜底保留] 域名 {lost_domain} 本次未被任何源收录，但DNS检测有效，保留上次IP: {lost_ip}")
+                    current_domains.add(lost_domain)
                 else:
                     logger.warning(f"[兜底丢弃] 域名 {lost_domain} 本次未被任何源收录，且DNS检测无效，丢弃上次IP: {lost_ip}")
+
+            # 4. 处理历史IP记录作为兜底候选IP（只收集，不增加新域名）
+            for domain, ip in self.domain_ip_history.items():
+                if domain in tracker_domains or domain.strip().lower() in disabled_domains:
+                    continue
+                if domain in current_domains:
+                    source_entries_map.setdefault("HistoryIPs", []).append(f"{ip}\t{domain}")
             # 5. 按域名分组并选择最佳IP
             self.task_status = {"status": "running", "message": "正在进行域名IP优选"}
             domain_ips = {}
@@ -584,6 +609,59 @@ class HostsManager:
         
         # 更新hosts
         self.update_hosts()
+
+    def add_dual_stack_ips(self, domain: str, ipv4: str, ipv6: str):
+        """双栈写入：同时将 IPv4 和 IPv6 存入配置，并触发 hosts 更新"""
+        logger.info(f"[双栈] 为 {domain} 写入 IPv4={ipv4}  IPv6={ipv6}")
+
+        self.best_cloudflare_ip = ipv4
+
+        if not self.config.get("trackers"):
+            self.config["trackers"] = []
+
+        for tracker in self.config["trackers"]:
+            if tracker["domain"] == domain:
+                tracker["ip"] = ipv4
+                tracker["ip6"] = ipv6
+                break
+        else:
+            self.config["trackers"].append({
+                "name": domain,
+                "domain": domain,
+                "ip": ipv4,
+                "ip6": ipv6,
+                "enable": True,
+            })
+
+        self._merge_write_config({"trackers": self.config.get("trackers", [])})
+
+        try:
+            import app.main
+            app.main.config = self.config
+        except Exception as e:
+            logger.error(f"同步全局配置失败: {e}")
+
+    def _update_all_trackers_dual_stack(self, ipv4: str, ipv6: str):
+        """批量将所有启用的 tracker 同时设置 IPv4 和 IPv6"""
+        if not self.config.get("trackers"):
+            return
+        for tracker in self.config["trackers"]:
+            if tracker.get("enable"):
+                tracker["ip"] = ipv4
+                tracker["ip6"] = ipv6
+        try:
+            import yaml
+            with open("config/config.yaml", 'w', encoding='utf-8') as f:
+                yaml.dump(self.config, f, default_flow_style=False, allow_unicode=True)
+        except Exception as e:
+            logger.error(f"保存双栈 tracker 配置失败: {e}")
+        try:
+            import app.main
+            app.main.config = self.config
+        except Exception:
+            pass
+        # 进行 hosts 更新（单次即可，_collect_pt_entries 会同时输出两条）
+        self.update_hosts()
     
     def _update_all_trackers_ip(self, ip: str):
         """更新所有tracker的IP为最优IP"""
@@ -743,28 +821,56 @@ class HostsManager:
                             current_domains.add(domain)
                             entry_count += 1
                         logger.info(f"处理hosts源 {source_name} 的 {entry_count} 条记录完成，耗时 {time.time() - entry_process_start:.2f} 秒")
-                for domain, ip in self.domain_ip_history.items():
-                    # 新增：跳过禁用tracker域名
-                    if domain in tracker_domains or domain.strip().lower() in disabled_domains:
-                        continue
-                    domain_ip_candidates.setdefault(domain, set()).add(ip)
-                    current_domains.add(domain)
             domain_ip_latency = {}
             log_lines = []
             merged_dict = {}
             
+            # 提前收集禁用源的缓存域名，防止兜底复活
+            disabled_source_domains = set()
+            if self.config.get("hosts_sources"):
+                for source in self.config["hosts_sources"]:
+                    if not source.get("enable") and source.get("url"):
+                        cache_path = self._get_cache_path(source["url"])
+                        if os.path.exists(cache_path):
+                            try:
+                                with open(cache_path, 'r', encoding='utf-8') as f:
+                                    for line in f:
+                                        line = line.strip()
+                                        if not line or line.startswith('#'): continue
+                                        parts = line.split()
+                                        if len(parts) >= 2:
+                                            disabled_source_domains.add(parts[1])
+                            except Exception:
+                                pass
+
             lost_domains = backup_domains - current_domains
             for lost_domain in lost_domains:
-                lost_ip = merged_hosts_backup[lost_domain]
-                if self._dns_check(lost_domain, lost_ip):
+                if lost_domain.strip().lower() in disabled_domains:
+                    continue
+                if lost_domain in disabled_source_domains:
+                    msg = f"[兜底跳过] 域名 {lost_domain} 属于已被关闭的Hosts源，不参与兜底保留"
+                    logger.info(msg)
+                    log_lines.append(msg)
+                    continue
+                if not abnormal_sources:
+                    continue
+                lost_ip = merged_hosts_backup.get(lost_domain)
+                if lost_ip and self._dns_check(lost_domain, lost_ip):
                     domain_ip_candidates.setdefault(lost_domain, set()).add(lost_ip)
                     msg = f"[兜底保留] 域名 {lost_domain} 本次未被任何源收录，但DNS检测有效，保留上次IP: {lost_ip}"
                     logger.warning(msg)
                     log_lines.append(msg)
+                    current_domains.add(lost_domain)
                 else:
                     msg = f"[兜底丢弃] 域名 {lost_domain} 本次未被任何源收录，且DNS检测无效，丢弃上次IP: {lost_ip}"
                     logger.warning(msg)
                     log_lines.append(msg)
+                    
+            for domain, ip in self.domain_ip_history.items():
+                if domain in tracker_domains or domain.strip().lower() in disabled_domains:
+                    continue
+                if domain in current_domains:
+                    domain_ip_candidates.setdefault(domain, set()).add(ip)
             for domain, ip_set in domain_ip_candidates.items():
                 if is_blacklisted(domain):
                     continue
@@ -806,27 +912,29 @@ class HostsManager:
                 logger.info(line)
             self._save_merged_hosts_backup(merged_dict)
             # 构建详细的通知消息（用于推送）
-            notify_msg_lines = ["Cloudflare优选完成！"]
+            notify_msg_lines = []
             
-            if old_ip:
-                notify_msg_lines.append(f"旧 IP 为：{old_ip}") 
+            notify_msg_lines.append("📈 任务统计：")
+            tracker_count = len(filtered_trackers) if isinstance(filtered_trackers, list) else 0
+            notify_msg_lines.append(f"🌐 影响站点：已更新 {tracker_count} 个 Tracker")
+            notify_msg_lines.append(f"📜 Hosts条目：共 {total_entries} 条记录")
+            total_duration = time.time() - task_start_time
+            notify_msg_lines.append(f"⏱️ 测速耗时：{total_duration:.2f} 秒")
+            notify_msg_lines.append("──────────")
+            notify_msg_lines.append("【🔍 优选详情】：")
             
             # 使用脚本输出的最优IP
             final_best_ip = best_ip if best_ip else self.best_cloudflare_ip
-            notify_msg_lines.append(f"新 IP 为：{final_best_ip}")
-            
-            # 计算总耗时
-            total_duration = time.time() - task_start_time
-            notify_msg_lines.append(f"测速耗时：{total_duration:.2f} 秒")
-
-            tracker_count = len(filtered_trackers) if isinstance(filtered_trackers, list) else 0
-            notify_msg_lines.append(f"已更新： {tracker_count} 个Tracker和 {total_entries} 条hosts记录")
+            notify_msg_lines.append(f"🆕 新 IP：{final_best_ip}")
+            if old_ip:
+                notify_msg_lines.append(f"📌 旧 IP：{old_ip}") 
             
             if log_lines:
                 # 筛选出兜底相关的日志
                 fallback_logs = [line for line in log_lines if "兜底" in line]
                 if fallback_logs:
-                    notify_msg_lines.append("兜底详情：")
+                    notify_msg_lines.append("──────────")
+                    notify_msg_lines.append("【🛡️ 兜底处理】：")
                     for log in fallback_logs:
                          # 格式化日志输出
                          if "保留上次IP" in log:
@@ -835,13 +943,19 @@ class HostsManager:
                                  domain_part = parts[0].split("域名")[1].split("本次")[0].strip()
                                  ip_part = parts[1].strip()
                                  notify_msg_lines.append(f"✅ 保留：{domain_part}")
-                                 notify_msg_lines.append(f"   IP：{ip_part}")
+                                 notify_msg_lines.append(f"     IP：{ip_part}")
                          elif "丢弃上次IP" in log:
                              parts = log.split("丢弃上次IP:")
                              if len(parts) > 1:
                                  domain_part = parts[0].split("域名")[1].split("本次")[0].strip()
-                                 ip_part = parts[1].strip()
                                  notify_msg_lines.append(f"❌ 丢弃：{domain_part}")
+                         elif "跳过" in log:
+                             if "兜底跳过] 域名 " in log:
+                                 try:
+                                     domain_part = log.split("兜底跳过] 域名 ")[1].split(" ")[0].strip()
+                                     notify_msg_lines.append(f"⚠️ 跳过：{domain_part}")
+                                 except Exception:
+                                     pass
 
             notify_message = "\n".join(notify_msg_lines)
             
@@ -1147,12 +1261,7 @@ class HostsManager:
                 '2803:f800::/32', '2c0f:f248::/32', '2a06:98c0::/29'
             ]
             
-            # 获取版本信息
-            family = socket.AF_INET if '.' in ip else socket.AF_INET6
-            
-            # 转换IP为网络字节序
 
-            
             try:
                 import ipaddress
                 ip_obj = ipaddress.ip_address(ip)

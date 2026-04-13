@@ -40,10 +40,10 @@
 
         <form @submit.prevent="saveCloudflareSettings" class="config-stage-body compact-stage-body">
           <div class="config-editor-shell">
-            <div class="toggle-row">
+              <div class="toggle-row">
               <label class="switch me-3">
                 <input type="checkbox" v-model="cfConfig.enable">
-                <div class="slider">
+                <div class="slider" :class="{ 'no-transition': loadingConfig }">
                   <div class="circle">
                     <svg class="cross" xml:space="preserve" style="enable-background:new 0 0 512 512" viewBox="0 0 365.696 365.696" y="0" x="0" height="6" width="6" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" xmlns="http://www.w3.org/2000/svg">
                       <g>
@@ -64,7 +64,29 @@
               </div>
             </div>
 
-            <div class="config-field">
+            <div class="toggle-row">
+              <label class="switch me-3">
+                <input type="checkbox" v-model="cfConfig.ipv6">
+                <div class="slider" :class="{ 'no-transition': loadingConfig }">
+                  <div class="circle">
+                    <svg class="cross" xml:space="preserve" style="enable-background:new 0 0 512 512" viewBox="0 0 365.696 365.696" y="0" x="0" height="6" width="6" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" xmlns="http://www.w3.org/2000/svg">
+                      <g>
+                        <path data-original="#000000" fill="currentColor" d="M243.188 182.86 356.32 69.726c12.5-12.5 12.5-32.766 0-45.247L341.238 9.398c-12.504-12.503-32.77-12.503-45.25 0L182.86 122.528 69.727 9.374c-12.5-12.5-32.766-12.5-45.247 0L9.375 24.457c-12.5 12.504-12.5 32.77 0 45.25l113.152 113.152L9.398 295.99c-12.503 12.503-12.503 32.769 0 45.25L24.48 356.32c12.5 12.5 32.766 12.5 45.247 0l113.132-113.132L295.99 356.32c12.503 12.5 32.769 12.5 45.25 0l15.081-15.082c12.5-12.504 12.5-32.77 0-45.25zm0 0"></path>
+                      </g>
+                    </svg>
+                    <svg class="checkmark" xml:space="preserve" style="enable-background:new 0 0 512 512" viewBox="0 0 24 24" y="0" x="0" height="10" width="10" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" xmlns="http://www.w3.org/2000/svg">
+                      <g>
+                        <path class="" data-original="#000000" fill="currentColor" d="M9.707 19.121a.997.997 0 0 1-1.414 0l-5.646-5.647a1.5 1.5 0 0 1 0-2.121l.707-.707a1.5 1.5 0 0 1 2.121 0L9 14.171l9.525-9.525a1.5 1.5 0 0 1 2.121 0l.707.707a1.5 1.5 0 0 1 0 2.121z"></path>
+                      </g>
+                    </svg>
+                  </div>
+                </div>
+              </label>
+              <div>
+                <strong>启用 IPv6 优选</strong>
+                <p>开启后 CloudflareST 将使用 IPv6 测速网络，需要您的网络环境支持。</p>
+              </div>
+            </div>            <div class="config-field">
               <label class="form-label">CRON 表达式</label>
               <CronInput v-model="cfConfig.cron" />
               <small>
@@ -118,9 +140,11 @@
         <div class="notice-panel">
           <h4><i class="bx bx-bulb"></i> 操作建议</h4>
           <ul>
-            <li>运行任务后建议到日志页查看执行结果。</li>
-            <li>修改 CRON 并保存后会立即生效。</li>
-            <li>清空操作会覆盖项目写入的 Hosts 分区。</li>
+            <li>运行任务后建议前往<strong>日志</strong>页查看详细执行结果。</li>
+            <li>修改 CRON 或配置后点击<strong>保存</strong>，调度器将立即重启生效。</li>
+            <li>开启 <strong>IPv6 优选</strong>后，将同时测速双栈并写入两条 Hosts 记录，系统自动选择最优协议。</li>
+            <li><strong>仅更新 Hosts</strong> 不会重新测速，直接沿用上次优选 IP 刷新内容。</li>
+            <li><strong>清空并重建</strong>仅移除本项目写入的 Hosts 分区，系统原有条目不受影响。</li>
           </ul>
         </div>
       </article>
@@ -143,15 +167,23 @@ const hostsStore = useHostsStore();
 const toast = useToast();
 const { confirm } = useConfirm();
 
-const schedulerRunning = ref(false);
-const jobs = ref<any[]>([]);
+const loadingConfig = ref(true);
+const schedulerRunning = ref(localStorage.getItem('scheduler_running') !== 'false');
+
+let cachedJobs: any[] = [];
+try {
+  cachedJobs = JSON.parse(localStorage.getItem('scheduler_jobs') || '[]');
+} catch (e) {}
+const jobs = ref<any[]>(cachedJobs);
+
 const runningCf = ref(false);
 const updatingHosts = ref(false);
 const clearing = ref(false);
 const savingCf = ref(false);
 const cfConfig = reactive({
-  enable: true,
-  cron: '0 0 * * *'
+  enable: localStorage.getItem('cf_enable') !== 'false',
+  cron: localStorage.getItem('cf_cron') || '0 0 * * *',
+  ipv6: localStorage.getItem('cf_ipv6') === 'true'
 });
 
 const getWorkflowJobs = (schedulerJobs: any[], config: any) => {
@@ -180,6 +212,13 @@ onMounted(async () => {
   await trackerStore.fetchConfig();
   cfConfig.enable = trackerStore.cloudflare.enable;
   cfConfig.cron = trackerStore.cloudflare.cron;
+  cfConfig.ipv6 = trackerStore.cloudflare.ipv6 || false;
+  
+  localStorage.setItem('cf_enable', String(cfConfig.enable));
+  localStorage.setItem('cf_cron', cfConfig.cron);
+  localStorage.setItem('cf_ipv6', String(cfConfig.ipv6));
+  
+  loadingConfig.value = false;
 });
 
 onUnmounted(() => {
@@ -193,6 +232,9 @@ const fetchStatus = async () => {
     ]);
     schedulerRunning.value = statusResponse.data.running;
     jobs.value = getWorkflowJobs(statusResponse.data.jobs || [], configResponse.data);
+    
+    localStorage.setItem('scheduler_running', String(schedulerRunning.value));
+    localStorage.setItem('scheduler_jobs', JSON.stringify(jobs.value));
   } catch (e) {
     console.error('Failed to fetch status', e);
   }
@@ -240,6 +282,9 @@ const saveCloudflareSettings = async () => {
   savingCf.value = true;
   try {
     await trackerStore.saveCloudflareConfig({ ...cfConfig });
+    localStorage.setItem('cf_enable', String(cfConfig.enable));
+    localStorage.setItem('cf_cron', cfConfig.cron);
+    localStorage.setItem('cf_ipv6', String(cfConfig.ipv6));
     toast.success('保存成功');
     fetchStatus(); // Refresh status as changing config might restart scheduler
   } catch (e) {
@@ -251,6 +296,10 @@ const saveCloudflareSettings = async () => {
 </script>
 
 <style scoped>
+.no-transition, .no-transition * {
+  transition: none !important;
+}
+
 .dashboard-redesign {
   display: flex;
   flex-direction: column;
