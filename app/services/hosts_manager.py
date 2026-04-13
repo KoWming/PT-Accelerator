@@ -692,81 +692,124 @@ class HostsManager:
         self.task_running = True
         self.task_status = {"status": "running", "message": "正在执行Cloudflare优选IP任务"}
         try:
-            # 架构自适应：未显式传入时按平台自动选择脚本
-            if not script_path:
-                machine = platform.machine().lower()
-                if machine in ("aarch64", "arm64"):
-                    script_path = "cfst_linux_arm64/cfst_hosts.sh"
-                else:
-                    script_path = "cfst_linux_amd64/cfst_hosts.sh"
-            task_start_time = time.time()
-            logger.info("开始执行严格串行的优选IP+更新tracker+更新hosts流程")
-            best_ip = None
-            old_ip = None
-            if os.path.exists(script_path):
-                self.task_status = {"status": "running", "message": "正在运行Cloudflare优选脚本"}
+            cloudflare_config = self.config.get("cloudflare", {})
+            ipv6_enabled = cloudflare_config.get("ipv6", False)
+
+            # ── IPv6 双栈路径：委托给 CloudflareSpeedTestService（已实现并行测速 + 双条写入）──
+            if ipv6_enabled:
+                logger.info("[双栈模式] IPv6 优选已开启，使用 CloudflareSpeedTestService 并行测速")
+                self.task_status = {"status": "running", "message": "正在并行测速 IPv4/IPv6..."}
                 try:
-                    # 增加超时时间，防止脚本无限挂起（30分钟）
-                    result = subprocess.run(["bash", script_path], capture_output=True, text=True, timeout=1800)
-                    if result.returncode == 0:
-                        logger.info(f"脚本执行成功: {result.stdout}")
-                        for line in result.stdout.splitlines():
-                            if "旧 IP 为" in line:
-                                parts = line.split("旧 IP 为")
-                                if len(parts) > 1:
-                                    old_ip = parts[1].strip()
-                            if "找到最优IP" in line or "新 IP 为" in line:
-                                if "新 IP 为" in line:
-                                    parts = line.split("新 IP 为")
-                                    if len(parts) > 1:
-                                        best_ip = parts[1].strip()
-                                        break
-                                else:
-                                    parts = line.split()
-                                    for i, part in enumerate(parts):
-                                        if part == "最优IP:" or part == "IP:":
-                                            best_ip = parts[i+1].strip().rstrip(',')
-                                            break
-                except subprocess.TimeoutExpired:
-                    logger.error(f"Cloudflare优选脚本执行超时(30分钟): {script_path}")
-                    self.task_status = {"status": "done", "message": "优选失败: 脚本执行超时"}
-                    self.task_running = False
-                    return False
+                    from app.globals import get_cloudflare_service
+                    cf_service = get_cloudflare_service()
+                    if cf_service is None:
+                        logger.error("[双栈模式] cloudflare_service 全局实例未初始化")
+                        self.task_status = {"status": "done", "message": "优选失败: 服务未初始化"}
+                        return False, "优选失败: cloudflare_service 未初始化"
+
+                    # cloudflare_service.run() 已在内部完成 IP 写入 + update_hosts()
+                    result = cf_service.run()
+                    ok = result.get("success", False) if isinstance(result, dict) else bool(result)
+                    if not ok:
+                        self.task_status = {"status": "done", "message": "双栈优选失败"}
+                        return False, "双栈优选失败，详见日志"
+
+                    self.task_status = {"status": "running", "message": "双栈优选完成，正在更新外部Hosts源"}
                 except Exception as e:
-                    logger.error(f"执行Cloudflare优选脚本发生未知错误: {str(e)}")
-                    self.task_status = {"status": "done", "message": f"优选失败: {str(e)}"}
-                    self.task_running = False
-                    return False, f"优选失败: {str(e)}"
+                    logger.error(f"[双栈模式] 调用 CloudflareSpeedTestService 失败: {e}")
+                    self.task_status = {"status": "done", "message": f"双栈优选失败: {e}"}
+                    return False, f"双栈优选失败: {e}"
+
+                # 继续执行外部 Hosts 源合并（与原流程下半段相同，从 sections 之后开始）
+                # 用 best_cloudflare_ip 供下方统计日志使用
+                best_ip = self.best_cloudflare_ip
+                old_ip = None
+                # 跳转到 hosts 源合并阶段（下面的代码会继续执行）
+                task_start_time = time.time()
+                logger.info("[双栈模式] 跳过 Shell 脚本，直接进入 Hosts 源合并阶段")
+
+                # ── 从此处起与原路径共用 ──
+                # （通过将控制流交给下方共用代码块实现）
+                # 注意: 此处 filtered_trackers 在 cf_service.run() 内部已更新，无需重复
+                filtered_trackers = [t for t in self.config.get("trackers", []) if t.get("enable")]
+
             else:
-                logger.error(f"脚本文件不存在: {script_path}")
-                self.task_status = {"status": "done", "message": f"优选失败: 脚本文件不存在: {script_path}"}
-                self.task_running = False
-                return False, f"优选失败: 脚本文件不存在: {script_path}"
-            if not best_ip:
-                logger.error("未能从脚本输出中提取到最优IP，流程中止")
-                self.task_status = {"status": "done", "message": "优选失败: 未能提取到最优IP"}
-                self.task_running = False
-                return False, "优选失败: 未能提取到最优IP"
-            self.best_cloudflare_ip = best_ip
-            logger.info(f"串行流程提取到最优IP: {best_ip}")
-            filtered_trackers = []  # 确保后续统计时变量已定义
-            if self.config.get("trackers"):
-                original_count = len(self.config["trackers"])
-                non_cf_domains = []
-                for tracker in self.config["trackers"]:
-                    if not tracker.get("domain"):
-                        continue
-                    domain = tracker["domain"]
-                    clean_domain = domain.split(':')[0] if ':' in domain else domain
-                    if self.is_cloudflare_domain(clean_domain):
-                        tracker["ip"] = best_ip
-                        filtered_trackers.append(tracker)
+                # ── 纯 IPv4 路径：原有 Shell 脚本逻辑 ────────────────────────────────────
+                # 架构自适应：未显式传入时按平台自动选择脚本
+                if not script_path:
+                    machine = platform.machine().lower()
+                    if machine in ("aarch64", "arm64"):
+                        script_path = "cfst_linux_arm64/cfst_hosts.sh"
                     else:
-                        non_cf_domains.append(domain)
-                if len(filtered_trackers) < original_count:
-                    self.config["trackers"] = filtered_trackers
-                    logger.info(f"[IP优选] 过滤了 {original_count - len(filtered_trackers)} 个非Cloudflare站点: {', '.join(non_cf_domains)}")
-                logger.info(f"已将 {len(filtered_trackers)} 个Cloudflare站点Tracker的IP更新为 {best_ip}")
+                        script_path = "cfst_linux_amd64/cfst_hosts.sh"
+                task_start_time = time.time()
+                logger.info("开始执行严格串行的优选IP+更新tracker+更新hosts流程")
+                best_ip = None
+                old_ip = None
+                if os.path.exists(script_path):
+                    self.task_status = {"status": "running", "message": "正在运行Cloudflare优选脚本"}
+                    try:
+                        # 增加超时时间，防止脚本无限挂起（30分钟）
+                        result = subprocess.run(["bash", script_path], capture_output=True, text=True, timeout=1800)
+                        if result.returncode == 0:
+                            logger.info(f"脚本执行成功: {result.stdout}")
+                            for line in result.stdout.splitlines():
+                                if "旧 IP 为" in line:
+                                    parts = line.split("旧 IP 为")
+                                    if len(parts) > 1:
+                                        old_ip = parts[1].strip()
+                                if "找到最优IP" in line or "新 IP 为" in line:
+                                    if "新 IP 为" in line:
+                                        parts = line.split("新 IP 为")
+                                        if len(parts) > 1:
+                                            best_ip = parts[1].strip()
+                                            break
+                                    else:
+                                        parts = line.split()
+                                        for i, part in enumerate(parts):
+                                            if part == "最优IP:" or part == "IP:":
+                                                best_ip = parts[i+1].strip().rstrip(',')
+                                                break
+                    except subprocess.TimeoutExpired:
+                        logger.error(f"Cloudflare优选脚本执行超时(30分钟): {script_path}")
+                        self.task_status = {"status": "done", "message": "优选失败: 脚本执行超时"}
+                        self.task_running = False
+                        return False
+                    except Exception as e:
+                        logger.error(f"执行Cloudflare优选脚本发生未知错误: {str(e)}")
+                        self.task_status = {"status": "done", "message": f"优选失败: {str(e)}"}
+                        self.task_running = False
+                        return False, f"优选失败: {str(e)}"
+                else:
+                    logger.error(f"脚本文件不存在: {script_path}")
+                    self.task_status = {"status": "done", "message": f"优选失败: 脚本文件不存在: {script_path}"}
+                    self.task_running = False
+                    return False, f"优选失败: 脚本文件不存在: {script_path}"
+                if not best_ip:
+                    logger.error("未能从脚本输出中提取到最优IP，流程中止")
+                    self.task_status = {"status": "done", "message": "优选失败: 未能提取到最优IP"}
+                    self.task_running = False
+                    return False, "优选失败: 未能提取到最优IP"
+                self.best_cloudflare_ip = best_ip
+                logger.info(f"串行流程提取到最优IP: {best_ip}")
+                filtered_trackers = []  # 确保后续统计时变量已定义
+                if self.config.get("trackers"):
+                    original_count = len(self.config["trackers"])
+                    non_cf_domains = []
+                    for tracker in self.config["trackers"]:
+                        if not tracker.get("domain"):
+                            continue
+                        domain = tracker["domain"]
+                        clean_domain = domain.split(':')[0] if ':' in domain else domain
+                        if self.is_cloudflare_domain(clean_domain):
+                            tracker["ip"] = best_ip
+                            filtered_trackers.append(tracker)
+                        else:
+                            non_cf_domains.append(domain)
+                    if len(filtered_trackers) < original_count:
+                        self.config["trackers"] = filtered_trackers
+                        logger.info(f"[IP优选] 过滤了 {original_count - len(filtered_trackers)} 个非Cloudflare站点: {', '.join(non_cf_domains)}")
+                    logger.info(f"已将 {len(filtered_trackers)} 个Cloudflare站点Tracker的IP更新为 {best_ip}")
 
             # 仅合并写 trackers（以及可能的 cloudflare_domains 后续有需要可一并传入）
             self._merge_write_config({"trackers": self.config.get("trackers", [])})
