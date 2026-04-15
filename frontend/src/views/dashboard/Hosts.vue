@@ -54,7 +54,7 @@
                 <div class="source-col-url mono-text" :title="source.url">{{ source.url }}</div>
                 <div class="source-col-switch">
                   <label class="switch source-switch">
-                    <input type="checkbox" :checked="source.enable" @change="toggleSource(source)">
+                    <input type="checkbox" :checked="source.enable" :disabled="isSourceToggling(source.url)" @change="toggleSource(source)">
                     <div class="slider">
                       <div class="circle">
                         <svg class="cross" xml:space="preserve" style="enable-background:new 0 0 512 512" viewBox="0 0 365.696 365.696" y="0" x="0" height="6" width="6" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" xmlns="http://www.w3.org/2000/svg">
@@ -268,6 +268,7 @@ const editingSourceUrl = ref('');
 
 const saving = ref(false);
 const editingContent = ref('');
+const togglingSourceUrls = ref<Set<string>>(new Set());
 
 const newSource = reactive<HostsSource>({
   name: '',
@@ -287,13 +288,27 @@ watch(showEditModal, (val) => {
 });
 
 const toggleSource = async (source: HostsSource) => {
+  if (isSourceToggling(source.url)) return;
+  const nextEnabled = !source.enable;
+  togglingSourceUrls.value = new Set(togglingSourceUrls.value).add(source.url);
   try {
-    await store.updateSource(source.url, { enable: !source.enable });
+    await store.updateSource(source.url, { enable: nextEnabled });
+    if (nextEnabled) {
+      toast.success(`已启用源“${source.name}”`);
+    } else {
+      toast.success(`已关闭源“${source.name}”，后台正在重建 Hosts`);
+    }
   } catch (e) {
     toast.error('更新失败');
     store.fetchConfig();
+  } finally {
+    const next = new Set(togglingSourceUrls.value);
+    next.delete(source.url);
+    togglingSourceUrls.value = next;
   }
 };
+
+const isSourceToggling = (url: string) => togglingSourceUrls.value.has(url);
 
 const confirmDelete = async (source: HostsSource) => {
   if (await confirm(`确定要删除 ${source.name} 吗？`, '删除确认')) {
