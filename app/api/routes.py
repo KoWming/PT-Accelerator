@@ -256,7 +256,7 @@ def _format_task_notify_content(title: str, content: str) -> str:
 
 def _send_task_notify(title: str, content: str):
     try:
-        pretty_title = TASK_NOTIFY_TITLE_MAP.get(title, f"📣 {title}")
+        pretty_title = ""
         pretty_content = _format_task_notify_content(title, content)
 
         cfg = get_config() or {}
