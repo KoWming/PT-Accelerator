@@ -177,28 +177,40 @@ def _format_ip_optimize_notify_content(title: str, text: str, time_text: str) ->
             other_lines.append(line)
 
     status_emoji, status_text = _extract_task_status(text)
-    fallback_block = "\n".join(fallback_lines) if fallback_lines else "无"
-    other_block = "\n".join(other_lines) if other_lines else "无"
+    sections = [
+        "【🚀 IP优选与Hosts更新】",
+        "──────────",
+        f"📌 任务类型：{title}",
+        f"{status_emoji} {status_text}",
+        "──────────",
+        "📊 优选结果：",
+        f"• 旧 IP：{old_ip}",
+        f"• 新 IP：{new_ip}",
+        f"• 测速耗时：{duration}",
+        f"• Tracker 更新数：{tracker_count}",
+        f"• Hosts 记录数：{hosts_count}",
+    ]
 
-    return (
-        "【🚀 IP优选与Hosts更新】\n"
-        "──────────\n"
-        f"📌 任务类型：{title}\n"
-        f"{status_emoji} {status_text}\n"
-        "──────────\n"
-        "📊 优选结果：\n"
-        f"• 旧 IP：{old_ip}\n"
-        f"• 新 IP：{new_ip}\n"
-        f"• 测速耗时：{duration}\n"
-        f"• Tracker 更新数：{tracker_count}\n"
-        f"• Hosts 记录数：{hosts_count}\n"
-        "──────────\n"
-        f"🧩 兜底详情：\n{fallback_block}\n"
-        "──────────\n"
-        f"📝 补充说明：\n{other_block}\n"
-        "──────────\n"
-        f"⏰ 推送时间：{time_text}"
-    )
+    if fallback_lines:
+        sections.extend([
+            "──────────",
+            "🧩 兜底详情：",
+            *fallback_lines,
+        ])
+
+    if other_lines:
+        sections.extend([
+            "──────────",
+            "📝 补充说明：",
+            *other_lines,
+        ])
+
+    sections.extend([
+        "──────────",
+        f"⏰ 推送时间：{time_text}",
+    ])
+
+    return "\n".join(sections)
 
 def _format_generic_task_notify_content(title: str, text: str, time_text: str) -> str:
     task_heading_map = {
