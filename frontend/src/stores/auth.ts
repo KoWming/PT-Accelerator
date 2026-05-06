@@ -1,55 +1,65 @@
 import { defineStore } from 'pinia';
-import axios from '../api/axios';
+import { auth, type LoginRequest } from '@/api';
+
+interface AuthStatusResponse {
+    logged_in?: boolean;
+    is_authenticated?: boolean;
+    username?: string;
+    user?: { username: string };
+    initialized?: boolean;
+}
 
 export const useAuthStore = defineStore('auth', {
     state: () => ({
-        user: null as any | null,
+        user: null as { username: string } | null,
         isAuthenticated: false,
+        initialized: false,
     }),
     actions: {
-        async login(formData: FormData) {
-            // The backend expects form data for login
-            // Override baseURL because login is at root, not /api
-            const response = await axios.post('/login', formData, {
-                baseURL: '/',
-                headers: {
-                    'Content-Type': 'multipart/form-data',
-                    'Accept': 'application/json'
-                }
-            });
+        async login(data: LoginRequest) {
+            const response = await auth.login(data);
+            const result = response.data;
 
-            // Backend returns JSON with success: true on success
-            // On failure it returns 400, which axios throws as error
-
-            if (response.data && response.data.success) {
+            // 适配 ApiResponse 格式：{ success: true, data: {...} }
+            if (result && (result.success !== false)) {
                 this.isAuthenticated = true;
-                // Fetch user info after login
                 await this.checkAuth();
             } else {
-                throw new Error(response.data?.message || 'Login failed');
+                throw new Error(result?.message || 'Login failed');
             }
 
             return response;
         },
         async logout() {
-            // Override baseURL because logout is at root
-            await axios.get('/logout', {
-                baseURL: '/',
-                headers: { 'Accept': 'application/json' }
-            });
+            await auth.logout();
             this.user = null;
             this.isAuthenticated = false;
         },
         async checkAuth() {
             try {
-                // axios instance has baseURL='/api', so this becomes /api/auth/status
-                const response = await axios.get('/auth/status');
-                const data = response.data;
-                this.isAuthenticated = data.is_authenticated;
-                this.user = data.user;
+                const response = await auth.status();
+                const rawData = response.data;
+
+                // 适配后端返回格式：{ logged_in, username } 或 ApiResponse{ success, data: {...} }
+                const statusData = (rawData as any)?.data || rawData as AuthStatusResponse;
+
+                // 同时支持 logged_in 和 is_authenticated
+                this.isAuthenticated = statusData?.logged_in || statusData?.is_authenticated || false;
+
+                // 适配 user 字段
+                if (statusData?.username) {
+                    this.user = { username: statusData.username };
+                } else if (statusData?.user) {
+                    this.user = statusData.user;
+                } else {
+                    this.user = null;
+                }
+
+                this.initialized = statusData?.initialized ?? true;
             } catch (error) {
                 this.isAuthenticated = false;
                 this.user = null;
+                this.initialized = false;
             }
         }
     },

@@ -1,292 +1,326 @@
-# PT-Accelerator v2.2.3
+# 🚀 PT-Accelerator-New
 
-一个面向PT站点用户的全自动加速与管理平台，采用 **Vue 3 + FastAPI** 前后端分离架构。集成Cloudflare IP优选、PT Tracker批量管理、GitHub/TMDB等站点加速、下载器一键导入、Web可视化配置等多种功能，支持Docker一键部署，适合所有对网络加速和PT站点体验有高要求的用户。
+面向 PT 场景的连接优化、追踪器管理、下载器同步与 Hosts / DNS 联动平台。
 
----
+## 📖 项目简介
 
-## 功能亮点
+`PT-Accelerator-New` 基于 `FastAPI + Vue 3` 构建，提供统一的 Web 控制台，用于管理 PT 常见的网络优化与自动化任务，包括：
 
-- **Cloudflare IP优选**：自动筛选更快的 Cloudflare IP，提升 PT 站点与 GitHub 等访问速度。
-- **Tracker 高效管理**：支持批量增删、状态切换、下载器导入与 Cloudflare 站点筛选。
-- **Hosts 智能合并**：内置多条 GitHub/TMDB Hosts 源，支持合并、去重、优选与在线编辑。
-- **下载器集中接入**：兼容 qBittorrent、Transmission 等主流下载器，支持多实例统一管理。
-- **可视化控制面板**：基于 **Vue 3 + FastAPI**，统一管理任务、日志、白名单、配置与通知。
-- **一键清理重建**：支持一键清空 Tracker、清空并重建 Hosts，减少历史污染影响。
-- **多渠道通知**：任务完成与异常状态可通过多种通知方式及时推送。
-- **跨平台部署**：支持 Docker 与原生 Python 环境，兼容 AMD64、ARM64 及主流桌面/服务器系统。
+- CFST 测速与优选
+- Tracker 列表维护与同步
+- qBittorrent / Transmission 下载器管理
+- 本地 Hosts 更新与路由器 DNS 联动
+- 定时任务调度
+- 通知推送
+- 配置备份与恢复
+- 日志查看与系统设置
 
----
+项目默认通过浏览器访问，无需单独部署前端服务。
 
-## 快速开始
+## 🔄 迁移说明
 
-### 1. Docker一键部署（推荐）
+- **暂不支持**使用旧版本配置文件直接覆盖新版本配置
+- 建议先单独部署 `PT-Accelerator-New` 容器并完成初始化
+- 待新版本运行正常后，再手动迁移旧版本配置到新版本**各项设置中**
+- 确认新版本配置与功能均正常后，再删除旧版本容器
 
-Docker镜像已包含构建好的前端资源，开箱即用。
-建议使用Vue 3构建的版本(旧版本镜像已不再更新)，版本标签为 latest-dev (支持自适应架构X86/arm64)
+## ✨ 核心功能
 
-```bash
-# 自动选择架构（推荐）
-docker run -d \
-  --name pt-accelerator \
-  --network host \
-  -v /etc/hosts:/etc/hosts \
-  -v /path/to/config:/app/config \
-  -v /path/to/logs:/app/logs \
-  -e TZ=Asia/Shanghai \
-  kowming/pt-accelerator:latest-dev
+### 1. ⚡ CFST 加速管理
+
+- 启动时自动检测 CFST 二进制
+- 缺失时尝试自动安装
+- 支持测速任务配置与结果管理
+- 可配合定时任务自动执行
+
+### 2. 🧭 Tracker 管理
+
+- 统一维护 Tracker 数据
+- 支持更新、检测与同步流程
+- 可与下载器配置联动
+
+### 3. 📦 下载器管理
+
+- 支持 `qBittorrent` 与 `Transmission`
+- 支持多客户端配置
+- 统一保存连接参数与启用状态
+
+### 4. 🌐 Hosts / DNS 联动
+
+- 支持本地 Hosts 更新
+- 支持备份原有 Hosts 内容
+- 支持与爱快、部分小米路由器 DNS 配置联动
+
+### 5. 💾 备份与恢复
+
+- 支持本地配置备份
+- 支持历史备份查看、恢复、删除
+- 支持 WebDAV 远程上传
+
+### 6. ⏰ 通知与调度
+
+- 基于 `APScheduler` 的定时任务机制
+- 支持任务异常与执行结果通知
+- 支持多类业务任务统一调度
+
+### 7. 🖥️ Web 控制台
+
+- 前端基于 `Vue 3 + Vite + TypeScript`
+- 提供认证、设置、日志、任务等可视化界面
+- 后端统一以 `/api` 提供接口
+
+## 🛠️ 技术栈
+
+### 后端
+
+- Python 3.12+
+- FastAPI
+- Uvicorn
+- APScheduler
+- Pydantic
+- PyYAML
+- httpx
+
+### 前端
+
+- Vue 3
+- TypeScript
+- Vite
+- Pinia
+- Axios
+- Bootstrap 5
+- Sass
+
+## 📁 目录结构
+
+```text
+PT-Accelerator-New/
+├─ app/                 后端主程序
+│  ├─ routes/           API 路由
+│  ├─ services/         核心业务服务
+│  ├─ pipelines/        自动化处理流程
+│  ├─ utils/            工具模块
+│  ├─ config.py         配置管理
+│  ├─ main.py           FastAPI 应用入口
+│  └─ models.py         数据模型定义
+├─ frontend/            前端源码
+├─ config/              配置目录
+├─ logs/                日志目录
+├─ cache/               缓存目录
+├─ CFST/                CFST 相关文件目录
+├─ Dockerfile           容器构建文件
+├─ docker-compose.yml   容器编排文件
+├─ requirements.txt     Python 依赖
+├─ main.py              项目启动入口
+├─ start.bat            Windows 启动脚本
+├─ start.sh             Linux/macOS 启动脚本
+└─ version.py           版本信息
 ```
 
-或使用`docker-compose.yml`：
+## 🚀 快速开始
+
+### 📋 运行要求
+
+- Python 3.12 或更高版本
+- Node.js 18+（仅前端开发或手动构建前端时需要）
+- Windows / Linux / macOS
+
+## ▶️ 本地运行
+
+### 🪟 Windows
+
+项目根目录执行：
+
+`start.bat`
+
+脚本会自动完成以下操作：
+
+- 创建 `venv` 虚拟环境
+- 安装 `requirements.txt` 依赖
+- 创建 `config`、`logs`、`cache`、`CFST` 目录
+- 启动后端服务
+
+### 🐧 Linux / macOS
+
+项目根目录执行：
+
+`bash start.sh`
+
+### 🔧 手动启动
+
+如果你希望自行控制环境，可在项目根目录执行：
+
+1. 创建虚拟环境并安装依赖
+2. 运行 `python main.py`
+
+应用默认监听端口：`23333`
+
+如需修改端口，可设置环境变量 `APP_PORT`。
+
+## 🐳 Docker 部署
+
+### 使用 Docker Compose
+
+项目已提供 `docker-compose.yml`，默认映射端口为 `23333`。
+
+可参考以下编排示例：
 
 ```yaml
+version: "3.8"
+
 services:
-  pt-accelerator:
-    image: kowming/pt-accelerator:latest-dev
-#    image: eternalcurse/pt-accelerator:latest
-    container_name: pt-accelerator
-    restart: unless-stopped
-    network_mode: host
-    environment:
-      - TZ=Asia/Shanghai
-    volumes:
-      - /etc/hosts:/etc/hosts
-      - ./config:/app/config
-      - ./logs:/app/logs
+	pt-accelerator:
+		image: pt-accelerator:new
+		container_name: pt-accelerator-new
+		restart: unless-stopped
+		ports:
+			- "23333:23333"
+		volumes:
+			- /etc/hosts:/etc/hosts  #必须，用于 Hosts 联动功能
+			- ./CFST:/app/CFST
+			- ./config:/app/config
+			- ./logs:/app/logs
+			- ./cache:/app/cache
+		environment:
+			- APP_PORT=23333
+		healthcheck:
+			test: ["CMD", "curl", "-f", "http://localhost:23333/api/health"]
+			interval: 30s
+			timeout: 10s
+			retries: 3
+			start_period: 10s
 ```
 
-创建上述`docker-compose.yml`文件后，在同一目录下运行：
+启动命令：
 
 ```bash
-docker-compose up -d
+docker compose up -d
 ```
 
-### 2. 本地运行（开发/调试）
+主要挂载目录：
 
-本项目采用前后端分离架构，本地运行需要分别构建前端和启动后端。
+- `/etc/hosts:/etc/hosts`  #必须，用于 Hosts 联动功能
+- `./CFST:/app/CFST`       #CFST 二进制与相关文件
+- `./config:/app/config`   #配置文件
+- `./logs:/app/logs`       #运行日志
+- `./cache:/app/cache`     #缓存数据
 
-**前置要求**：
-- Node.js 20+
-- Python 3.11+
+可通过环境变量覆盖端口：
 
-#### 步骤一：构建前端 (Vue 3)
+- `APP_PORT=23333`
+
+容器健康检查接口：
+
+- `/api/health`
+
+### 使用 docker run
+
+如果你不使用 Compose，也可以直接运行：
 
 ```bash
-# 进入前端目录
-cd frontend
-
-# 安装依赖
-npm install
-
-# 构建生产环境资源 (生成 dist 目录)
-npm run build
-
-# 返回项目根目录
-cd ..
+docker run -d \
+	--name pt-accelerator-new \
+	--restart unless-stopped \
+	-p 23333:23333 \
+	-e APP_PORT=23333 \
+	-v /etc/hosts:/etc/hosts \
+	-v ./CFST:/app/CFST \
+	-v ./config:/app/config \
+	-v ./logs:/app/logs \
+	-v ./cache:/app/cache \
+	pt-accelerator:new
 ```
 
-#### 步骤二：启动后端 (FastAPI)
-
-后端会自动挂载前端构建生成的 `frontend/dist` 目录。
+如需本地构建镜像，可执行：
 
 ```bash
-# 安装后端依赖
-pip install -r requirements.txt
-
-# 启动服务
-bash start.sh
-# 或手动运行
-# python -m uvicorn app.main:app --host 0.0.0.0 --port ${APP_PORT:-23333}
+docker build -t pt-accelerator:new
 ```
 
-#### 开发模式 (热重载)
+### Docker 构建特点
 
-如果你需要修改前端代码，建议同时开启前后端开发服务器：
+- 使用多阶段构建
+- 前端在构建阶段自动打包
+- 后端镜像基于 `python:3.12-slim`
 
-1.  **启动后端**：
-    ```bash
-    python -m uvicorn app.main:app --host 0.0.0.0 --port 23333 --reload
-    ```
-2.  **启动前端 (Vite)**：
-    ```bash
-    cd frontend
-    npm run dev
-    ```
-    访问 Vite 提供的开发地址 (通常是 `http://localhost:5173`) 进行调试。
+## 🔗 访问入口
 
----
+启动成功后，可访问：
 
-## Web界面入口
+- 前端页面：`http://localhost:23333`
+- 健康检查：`http://localhost:23333/api/health`
+- OpenAPI 文档：`http://localhost:23333/docs`
 
-- 访问：http://your-ip:<端口号>
-- 首次访问或根据配置，可能需要进行用户登录。
-- 默认端口：`23333`。可以通过以下方式修改：
-  - **Docker/Docker Compose**:
-    - 在 `docker-compose.yml` 文件中，为 `pt-accelerator` 服务的 `environment` 部分添加或修改 `APP_PORT` 的值。例如:
-      ```yaml
-      services:
-        pt-accelerator:
-          # ... other settings ...
-          environment:
-            - TZ=Asia/Shanghai
-            - APP_PORT=8080 # 设置自定义端口
-      ```
-    - 或者，在 `docker-compose.yml` 同级目录下创建 `.env` 文件并写入 `APP_PORT=8080`，这会覆盖 `docker-compose.yml` 中的默认设置（如果存在）。
-  - **本地运行**: 启动前设置 `APP_PORT` 环境变量 (例如 `export APP_PORT=8080 && bash start.sh`)，或者直接修改 `start.sh` 脚本中的默认端口。
-- 支持多用户同时操作，所有配置实时生效
+## 🧩 主要接口模块
 
----
+后端接口统一挂载在 `/api` 下，主要包含：
 
-## 主要功能模块
+- `/api/auth`：登录、登出、CSRF、状态
+- `/api/cfst`：CFST 配置、执行、结果
+- `/api/trackers`：Tracker 管理
+- `/api/clients`：下载器管理
+- `/api/hosts`：Hosts 管理
+- `/api/ikuai`：爱快联动
+- `/api/mihosts`：小米路由器联动
+- `/api/scheduler`：定时任务管理
+- `/api/notify`：通知渠道配置
+- `/api/backup`：备份与恢复
+- `/api/logs`：日志查看
+- `/api/settings`：系统设置
 
-- 查看调度器状态、定时任务列表，一键触发 IP 优选与 Hosts 更新
-- 一键仅更新 Hosts（沿用上次优选 IP，不重新测速）
-- 一键清空并重建（仅移除项目写入分区，系统原有内容不受影响）
-- 配置 CRON 定时任务，保存后立即生效
+## ⚙️ 配置说明
 
-### 2. Tracker 管理
-- 批量添加、批量清空、单个删除、状态切换
-- 一键从下载器导入 Tracker（自动筛选 Cloudflare 站点）
-- Cloudflare 白名单管理、Tracker IP 一键批量更新
+### 配置目录
 
-### 3. Hosts 源管理
-- 多条外部 Hosts 源自动合并、去重、优选（延迟最低原则）
-- 支持添加、删除、启用/禁用 Hosts 源
-- 内置 GitHub/TMDB 加速 Hosts 源，自动定时更新
+- `config/config.yaml`：主配置文件
+- `config/.schema_version`：配置结构版本标记
 
-### 4. 下载器管理
-- 支持多个 qBittorrent / Transmission 实例，各自独立配置
-- 一键测试连接、保存配置、导入 Tracker
-- 支持 HTTPS、端口、用户名密码等完整配置
+首次启动时，程序会自动初始化默认配置。
 
-### 5. 日志与监控
-- 实时查看系统日志、任务进度，支持自动滚动与一键清空
+### 数据目录用途
 
-### 6. Hosts 文件管理
-- 在线编辑 Hosts 文件，实时预览、保存，保护系统原有结构
+| 目录 | 用途 |
+| --- | --- |
+| `/etc/hosts` | 必须挂载，用于 Hosts 联动功能 |
+| `config/` | 配置文件与配置版本信息 |
+| `logs/` | 运行日志 |
+| `cache/` | 缓存数据 |
+| `CFST/` | CFST 二进制、测速相关文件 |
 
-### 7. 通知系统
-- 统一格式推送（`【标题】` + emoji + 分隔符），支持一言日报尾缀
-- **支持渠道**：Telegram、企业微信、SMTP、Bark、WxPusher、Gotify、MediaSaber、Webhook
+## 🧪 开发说明
 
-### 8. 备份与恢复
-- WebDAV 自动备份（坚果云、Nextcloud 等），支持一键恢复、版本控制
+### 前端开发
 
-## CloudflareSpeedTest说明
+前端源码位于 `frontend/`，技术栈为 `Vite + Vue 3 + TypeScript`。
 
-- 已内置CloudflareST二进制和测速脚本，自动调用，无需手动操作
-- **架构自适应**：自动检测系统架构（AMD64/ARM64），选择对应的可执行文件和配置文件
-- 相关参数和测速数据文件（ip.txt/ipv6.txt）可在对应架构目录下自定义：
-  - AMD64架构：`cfst_linux_amd64/` 目录
-  - ARM64架构：`cfst_linux_arm64/` 目录
-- 自动筛选延迟低、速度快的优质CF节点IP
-- 支持IPv4/IPv6双协议测速
-- Docker构建时自动排除不需要的架构文件，优化镜像大小
-- 参考：https://github.com/XIU2/CloudflareSpeedTest
+常见流程：
 
----
+1. 安装前端依赖
+2. 在 `frontend/` 下启动开发服务
+3. 构建后生成 `frontend/dist`
 
-## 常见问题
+生产环境下，后端会优先加载 `frontend/dist`，并自动处理 SPA 路由回退。
 
-- **Q: 为什么要挂载/etc/hosts？**  
-  A: 程序需要直接更新系统 `hosts` 文件以实现加速，因此必须具备写入权限。
+### 后端开发
 
-- **Q: 如何彻底清空tracker或hosts？**  
-  A: 可在 Web 界面使用“清空所有 Tracker”和“清空 Hosts 并重建”功能快速处理。
+- Web 应用实例位于 `app/main.py`
+- 项目统一启动入口位于根目录 `main.py`
+- 调试模式下可启用自动重载
 
-- **Q: 日志和配置如何持久化？**  
-  A: 建议将 `/app/config` 和 `/app/logs` 挂载到宿主机目录，避免容器重启后数据丢失。
+## ⚠️ 注意事项
 
-- **Q: 如果系统使用了代理，会影响IP测速吗？**  
-  A: 会。建议测速时临时关闭系统代理，以获得更准确的结果。
+- CFST 不存在时，程序会尝试自动安装；失败后可手动放入 `CFST/` 目录
+- 修改本地 Hosts 通常需要管理员或 root 权限
+- 默认端口为 `23333`，如端口冲突请修改 `APP_PORT`
+- 首次启动会自动创建配置与运行目录
+- Docker 部署下不依赖单独启动前端服务
 
-- **Q: 项目如何更新？**  
-  A: Docker 部署可先拉取最新镜像，再重新创建容器完成更新。
+## 🏷️ 版本信息
 
-- **Q: 支持哪些架构？**  
-  A: 支持 AMD64 和 ARM64，包括 x86_64 服务器、树莓派及 ARM 设备，Docker 会自动匹配镜像。
+当前项目版本：`3.0.0`
 
-- **Q: 支持哪些通知方式？**  
-  A: 支持多种通知渠道，可在配置页面按需设置发送方式与频率。
+## 📄 许可证
 
-- **Q: 清空Hosts会破坏系统配置吗？**  
-  A: 不会。系统会保留原有 Hosts 头部结构，仅清理 PT-Accelerator 写入的内容。
+本项目基于 **MIT License** 开源发布。
 
-- **Q: 如何让Docker容器化的下载器（如qBittorrent）使用优化后的hosts？**  
-  A: 需要在下载器容器中显式挂载宿主机 `hosts` 文件，例如：
-  ```yaml
-  services:
-    qbittorrent:
-      image: linuxserver/qbittorrent
-      # ... 其他配置 ...
-      volumes:
-        - /etc/hosts:/etc/hosts:ro  # 挂载hosts文件为只读
-        - ./config:/config
-        - ./downloads:/downloads
-  ```
-        无论使用 `host` 还是 `bridge` 网络模式，都需要手动挂载；宿主机更新后，容器内也会同步生效。
-
----
-
-## 技术栈
-
-### 前端 (Frontend)
-- **核心框架**: Vue 3, Vite
-- **语言**: TypeScript
-- **UI框架**: Bootstrap 5
-- **状态管理**: Pinia
-- **样式预处理**: Sass
-
-### 后端 (Backend)
-- **核心框架**: FastAPI (Python 3.11+)
-- **服务器**: Uvicorn
-- **任务调度**: APScheduler
-- **依赖库**: python-hosts, transmission-rpc, dnspython, passlib, croniter, aiohttp
-
-### 部署与运维 (DevOps)
-- **容器化**: Docker (支持 AMD64/ARM64 多架构)
-- **CI/CD**: GitHub Actions
-- **核心组件**: CloudflareSpeedTest (内置)
-
----
-
-## 参考项目
-
-- [CloudflareSpeedTest](https://github.com/XIU2/CloudflareSpeedTest) - 优质Cloudflare IP测速工具
-- [GitHub Hosts](https://gitlab.com/ineo6/hosts) - 优质GitHub加速hosts源
-
----
-
-## 版本更新日志
-
-### 最新版本 (v2.2.3)
-
-- ✅ **Hosts 源关闭即时生效**：关闭任意 Hosts 源后，后端会立即触发一次 Hosts 重建，并清理旧的合并备份，避免已关闭源继续参与优选。
-- ✅ **通知推送结构优化**：统一优化 `IP优选与Hosts更新`、`仅更新Hosts`、`清空并更新Hosts` 的通知标题与内容排版，重点信息展示更清晰。
-- ✅ **交互与资源加载改进**：Hosts 源开关增加前端状态提示与防重复点击保护，同时将 Boxicons 改为本地加载，减少外部 CDN 依赖。
-
-### 版本历史
-
-- **v2.2.3** (2026-04-15) - 优化 Hosts 源关闭后的即时重建流程、通知推送展示格式，并改为本地加载 Boxicons 资源
-- **v2.2.1** (2026-03-29) - UI细节优化
-- **v2.2.0** (2026-03-27) - UI 全面重构，优化视觉设计与交互体验
-- **v2.1.0** (2026-02-26) - 修复批量更新IP确定按钮悬停样式、Trackers列表支持多字段点击排序、增强批量添加提示与稳定性
-- **v2.0.8** (2026-01-01) - 修复一言API超时问题
-- **v2.0.7** (2025-12-30) - 优化日志显示策略：前端日志极简模式，移动端通知保留详细信息
-- **v2.0.6** (2025-12-30) - 修复定时任务僵死问题(Host/Notify超时保护)，优化Shell脚本非交互运行逻辑
-- **v2.0.5** (2025-11-17) - 修复企业微信App加载渠道配置编辑失败问题，新增转发代理配置
-- **v2.0.4** (2025-11-16) - 修复定时任务跳过执行问题、修复多通知渠道重复发送问题
-- **v2.0.3** (2025-10-12) - 添加Media Saber通知渠道
-- **v2.0.2** (2025-10-11) - 修复自定义通知配置问题
-- **v2.0.1** (2025-10-11) - 修复自定义通知配置问题
-- **v2.0.0** (2025-09-25) - 架构自适应支持、多通知渠道、移动端适配、Hosts结构保护
-- **v1.0.0** (2025-04-29) - 初始版本发布
-
----
-
-## 许可证
-
-MIT License
-
----
-
-如有问题、建议或需求，欢迎在GitHub Issue区反馈！
+许可证全文请见：`LICENSE`

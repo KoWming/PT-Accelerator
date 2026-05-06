@@ -1,13 +1,23 @@
+version: "3.8"
+
 services:
   pt-accelerator:
-    image: eternalcurse/pt-accelerator:latest
-    container_name: pt-accelerator
+    image: pt-accelerator:new
+    container_name: pt-accelerator-new
     restart: unless-stopped
-    network_mode: host
-    environment:
-      TZ: Asia/Shanghai
-      APP_PORT: 23333
+    ports:
+      - "23333:23333"
     volumes:
-      - /etc/hosts:/etc/hosts
+      - /etc/hosts:/etc/hosts  #必须，用于 Hosts 联动功能
+      - ./CFST:/app/CFST
       - ./config:/app/config
       - ./logs:/app/logs
+      - ./cache:/app/cache
+    environment:
+      - APP_PORT=23333
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:23333/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s

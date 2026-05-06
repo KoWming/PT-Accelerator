@@ -1,125 +1,203 @@
-from fastapi import Request, HTTPException, status
-from passlib.context import CryptContext
-from itsdangerous import URLSafeTimedSerializer, SignatureExpired, BadTimeSignature
-import os
-import yaml
-import logging
+"""
+认证工具：密码哈希、Session 管理
+
+所有模块通过以下方式验证登录：
+    from app.auth import verify_session, verify_password, hash_password
+
+Session 存储：本地 JSON 文件 + 内存缓存
+密码存储：从 config.auth 读取，支持首次安装时初始化
+"""
+import hashlib
+import json
+import secrets
+from datetime import datetime, timedelta
+from pathlib import Path
 from typing import Optional
-from app.models import User
 
-# 配置日志
-logger = logging.getLogger(__name__)
+from fastapi import HTTPException, Request
 
-# 密码处理上下文
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+from app.utils.logger import get_logger
 
-# Session 签名器
-session_serializer = None
+logger = get_logger(__name__)
 
-# 配置路径
-CONFIG_PATH = "config/config.yaml"
+# Session 存储（生产环境应替换为 Redis）
+SESSIONS_FILE = Path("cache") / "sessions.json"
+_sessions: dict[str, dict] = {}
+SESSION_TTL = timedelta(hours=24)
 
-def init_session_serializer(secret_key: str):
-    """初始化session签名器"""
-    global session_serializer
-    session_serializer = URLSafeTimedSerializer(secret_key)
 
-def verify_password(plain_password, hashed_password):
-    """验证密码"""
-    return pwd_context.verify(plain_password, hashed_password)
-
-def get_password_hash(password):
-    """生成密码哈希"""
-    return pwd_context.hash(password)
-
-async def get_current_user(request: Request) -> Optional[User]:
-    """获取当前登录用户"""
-    # 加载当前配置以检查认证是否启用
-    config = load_current_config()
-    
-    # 如果未启用认证，返回游客用户
-    if not config.get("auth", {}).get("enable", False):
-        return User(username="guest", is_authenticated=False)
-    
-    # 检查session中的用户信息
-    user_data = request.session.get("user")
-    if not user_data:
-        return None
-    
+def _parse_created_at(value: str) -> Optional[datetime]:
     try:
-        # 验证session token  
-        if session_serializer and user_data.get("token"):
-            username = session_serializer.loads(user_data.get("token", ""), max_age=3600*24*7)  # 7天有效期
-            if username == user_data.get("username"):
-                return User(username=username, is_authenticated=True)
-        elif user_data.get("username"):
-            # 向后兼容没有token的旧session格式
-            return User(username=user_data.get("username"), is_authenticated=True)
-    except (SignatureExpired, BadTimeSignature):
-        # Token过期或无效，清除session
-        request.session.pop("user", None)
+        return datetime.fromisoformat(value)
+    except (TypeError, ValueError):
         return None
-    
-    return None
 
-def load_current_config():
-    """加载当前配置文件"""
-    if os.path.exists(CONFIG_PATH):
-        try:
-            # 优先UTF-8，失败回退GBK/GB18030
-            try:
-                with open(CONFIG_PATH, 'r', encoding='utf-8') as f:
-                    config = yaml.safe_load(f) or {}
-                # 确保配置中有auth部分（UTF-8成功路径也需保证）
-                if "auth" not in config:
-                    config["auth"] = {}
-                return config
-            except UnicodeDecodeError:
-                try:
-                    with open(CONFIG_PATH, 'r', encoding='gbk') as f:
-                        config = yaml.safe_load(f) or {}
-                except UnicodeDecodeError:
-                    with open(CONFIG_PATH, 'r', encoding='gb18030') as f:
-                        config = yaml.safe_load(f) or {}
-                # 确保配置中有auth部分
-                if "auth" not in config:
-                    config["auth"] = {}
-                return config
-        except Exception as e:
-            logger.error(f"加载配置文件失败: {e}")
-            return {"auth": {}}
-    return {"auth": {}}
 
-def create_user_session(username: str) -> dict:
-    """创建用户session数据"""
-    if session_serializer:
-        token = session_serializer.dumps(username)
-        return {
-            "username": username,
-            "token": token
-        }
-    return {"username": username}
-
-def reload_global_config():
-    """重新加载全局配置，确保认证配置更改能立即生效"""
+def _save_sessions():
     try:
-        # 动态导入以避免循环导入
-        import importlib
-        import app.main
-        
-        # 重新加载当前配置
-        new_config = load_current_config()
-        
-        # 更新全局配置
-        app.main.config.clear()
-        app.main.config.update(new_config)
-        
-        # 如果secret_key发生变化，重新初始化session序列化器
-        if new_config.get("auth", {}).get("secret_key"):
-            init_session_serializer(new_config["auth"]["secret_key"])
-            
-        logger.info("全局配置已重新加载，认证配置变更立即生效")
-        return True
+        SESSIONS_FILE.parent.mkdir(parents=True, exist_ok=True)
+        SESSIONS_FILE.write_text(json.dumps(_sessions, ensure_ascii=False, indent=2), encoding="utf-8")
     except Exception as e:
-        logger.error(f"重新加载全局配置失败: {e}")
-        return False 
+        logger.warning(f"保存会话缓存失败：{e}")
+
+
+def _cleanup_expired_sessions(save: bool = True):
+    expired_session_ids: list[str] = []
+    now = datetime.now()
+
+    for session_id, session in list(_sessions.items()):
+        created_at = _parse_created_at(session.get("created_at", ""))
+        if not created_at or now - created_at > SESSION_TTL:
+            expired_session_ids.append(session_id)
+
+    for session_id in expired_session_ids:
+        _sessions.pop(session_id, None)
+
+    if expired_session_ids and save:
+        _save_sessions()
+
+
+def _load_sessions():
+    if not SESSIONS_FILE.exists():
+        return
+
+    try:
+        loaded = json.loads(SESSIONS_FILE.read_text(encoding="utf-8"))
+        if isinstance(loaded, dict):
+            _sessions.update(loaded)
+        _cleanup_expired_sessions(save=False)
+        logger.info(f"已加载 {len(_sessions)} 个本地会话")
+    except Exception as e:
+        logger.warning(f"加载本地会话失败：{e}")
+
+
+_load_sessions()
+
+
+def hash_password(password: str, salt: Optional[str] = None) -> tuple[str, str]:
+    """
+    PBKDF2-SHA256 哈希密码，返回 (hashed_password, salt)
+
+    用途：
+    - 注册/修改密码时调用
+    - 验证密码时调用 verify_password(password, hash, salt)
+    """
+    if salt is None:
+        salt = secrets.token_hex(16)
+    hashed = hashlib.pbkdf2_hmac("sha256", password.encode(), salt.encode(), 100000)
+    return hashed.hex(), salt
+
+
+def verify_password(password: str, hashed: str, salt: str) -> bool:
+    """验证密码是否匹配"""
+    expected, _ = hash_password(password, salt)
+    return secrets.compare_digest(expected, hashed)
+
+
+def create_session(user_id: str, username: str) -> str:
+    """创建 session，返回 session_id"""
+    session_id = secrets.token_urlsafe(32)
+    _sessions[session_id] = {
+        "user_id": user_id,
+        "username": username,
+        "created_at": datetime.now().isoformat(),
+    }
+    _save_sessions()
+    logger.info(f"已为用户创建会话：{username}")
+    return session_id
+
+
+def get_session(session_id: str) -> Optional[dict]:
+    """获取 session，不存在或已过期返回 None"""
+    session = _sessions.get(session_id)
+    if not session:
+        return None
+
+    created_at = _parse_created_at(session.get("created_at", ""))
+    if not created_at or datetime.now() - created_at > SESSION_TTL:
+        delete_session(session_id)
+        return None
+
+    return session
+
+
+def delete_session(session_id: str):
+    """删除指定 session"""
+    removed = _sessions.pop(session_id, None)
+    if removed is not None:
+        _save_sessions()
+
+
+def clear_all_sessions():
+    """清除所有 session（用于测试或安全事件）"""
+    _sessions.clear()
+    if SESSIONS_FILE.exists():
+        try:
+            SESSIONS_FILE.unlink()
+        except Exception as e:
+            logger.warning(f"删除会话缓存文件失败：{e}")
+    logger.warning("已清除所有会话")
+
+
+def is_initialized() -> bool:
+    """
+    检查是否已完成初始密码设置。
+    config.auth.password_hash 为空时表示未初始化。
+    """
+    try:
+        from app.config import config
+        return bool(config.get("auth.password_hash"))
+    except Exception:
+        return False
+
+
+def get_default_username() -> str:
+    """获取默认用户名"""
+    try:
+        from app.config import config
+        return config.get("auth.username", default="admin")
+    except Exception:
+        return "admin"
+
+
+async def verify_session(request: Request) -> dict:
+    """
+    依赖注入：验证请求中的 session
+    从 Cookie 或 Authorization Header 获取 session_id
+
+    验证成功：返回 session dict {user_id, username, created_at}
+    验证失败：抛出 HTTPException(401)
+    """
+    # 优先从 Cookie 获取
+    session_id = request.cookies.get("session")
+
+    # 其次从 Authorization Header 获取（格式：Bearer <session_id>）
+    if not session_id:
+        auth_header = request.headers.get("Authorization", "")
+        if auth_header.startswith("Bearer "):
+            session_id = auth_header[7:]
+
+    if not session_id:
+        raise HTTPException(status_code=401, detail="未登录，请先登录")
+
+    session = get_session(session_id)
+    if not session:
+        raise HTTPException(status_code=401, detail="会话已过期，请重新登录")
+
+    logger.debug(f"会话校验通过：{session['username']}")
+    return session
+
+
+def require_initialized(func):
+    """
+    装饰器：要求已完成初始密码设置
+    未初始化时返回 403，引导用户设置密码
+    """
+    async def wrapper(*args, **kwargs):
+        if not is_initialized():
+            raise HTTPException(
+                status_code=403,
+                detail="未初始化，请先设置管理员密码",
+            )
+        return await func(*args, **kwargs)
+    return wrapper

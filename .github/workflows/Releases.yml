@@ -2,11 +2,11 @@ name: Build and Publish Docker Image (Docker Hub)
 
 on:
   push:
-    branches: [ latest-dev ]
+    branches: [ new ]
   workflow_dispatch:
     inputs:
       version:
-        description: '自定义版本号 (例如: v1.0.0)'
+        description: '自定义版本号 (例如: v3.0.0)'
         required: false
         default: ''
         type: string
@@ -41,6 +41,5 @@ jobs:
           file: ./Dockerfile
           platforms: linux/amd64,linux/arm64
           push: true
-          target: with-frontend
-          tags: docker.io/${{ secrets.DOCKER_USERNAME }}/pt-accelerator:latest-dev
+          tags: docker.io/${{ secrets.DOCKER_USERNAME }}/pt-accelerator:new
 

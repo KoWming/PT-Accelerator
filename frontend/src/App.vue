@@ -7,10 +7,10 @@
 
     <!-- Main Dashboard Layout -->
     <div v-else>
-      <Sidebar :is-open="sidebarOpen" @close="sidebarOpen = false" @logout="logout" />
+      <AppSidebar :is-open="sidebarOpen" @close="sidebarOpen = false" @logout="logout" />
       
       <div class="main-content">
-        <Header @toggle-sidebar="sidebarOpen = !sidebarOpen" />
+        <AppHeader @toggle-sidebar="sidebarOpen = !sidebarOpen" />
         
         <main class="flex-grow-1 px-4 pb-4 pt-4 pt-lg-0 d-flex flex-column">
           <RouterView v-slot="{ Component }">
@@ -20,30 +20,11 @@
           </RouterView>
         </main>
         
-        <footer class="text-center py-3 text-muted small">
-          <p class="mb-0">
-            PT-Accelerator &copy; {{ new Date().getFullYear() }}
-            <span
-              class="version-pill"
-              tabindex="0"
-              @mouseenter="handleVersionPillFocus"
-              @focus="handleVersionPillFocus"
-            >
-              {{ appVersion }}
-              <span class="easter-egg-tooltip">
-                {{ hitokotoText }}
-                <i class="star-1">✦</i>
-                <i class="star-2">★</i>
-                <i class="star-3">✦</i>
-                <i class="star-4">★</i>
-              </span>
-            </span>
-            <a href="https://github.com/KoWming/PT-Accelerator" target="_blank" class="github-link">
-              <i class="bx bxl-github"></i>
-              <span>GitHub</span>
-            </a>
-          </p>
-        </footer>
+        <AppFooter
+          :app-version="appVersion"
+          :hitokoto-text="hitokotoText"
+          @focus-version="handleVersionPillFocus"
+        />
       </div>
     </div>
   </div>
@@ -51,21 +32,49 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, onMounted } from 'vue';
+import { computed, ref, onMounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { useAuthStore } from './stores/auth';
-import Sidebar from './components/layout/Sidebar.vue';
-import Header from './components/layout/Header.vue';
-import ConfirmModal from './components/ConfirmModal.vue';
+import { useAuthStore } from '@/stores/auth';
+import AppSidebar from '@/components/layout/AppSidebar.vue';
+import AppHeader from '@/components/layout/AppHeader.vue';
+import AppFooter from '@/components/layout/AppFooter.vue';
+import ConfirmModal from '@/components/common/ConfirmModal.vue';
 
 const route = useRoute();
 const router = useRouter();
 const authStore = useAuthStore();
 
+type ThemeMode = 'system' | 'dark' | 'light';
+
 const isLoginPage = computed(() => route.path === '/login');
 const sidebarOpen = ref(false);
 const hitokotoText = ref('妹妹说紫色很有韵味！');
 const isFetchingHitokoto = ref(false);
+
+const getSystemPrefersDark = () => {
+  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+    return true;
+  }
+  return window.matchMedia('(prefers-color-scheme: dark)').matches;
+};
+
+const applyTheme = () => {
+  if (typeof document === 'undefined') {
+    return;
+  }
+
+  const savedTheme = localStorage.getItem('theme');
+  const themeMode: ThemeMode = savedTheme === 'light' || savedTheme === 'dark' || savedTheme === 'system'
+    ? savedTheme
+    : 'system';
+  const shouldUseDark = themeMode === 'system' ? getSystemPrefersDark() : themeMode === 'dark';
+
+  if (shouldUseDark) {
+    document.body.classList.remove('light-theme');
+  } else {
+    document.body.classList.add('light-theme');
+  }
+};
 
 const logout = async () => {
   await authStore.logout();
@@ -102,14 +111,22 @@ const handleVersionPillFocus = () => {
   void fetchHitokoto();
 };
 
+watch(() => route.path, () => {
+  applyTheme();
+});
+
 onMounted(async () => {
+  applyTheme();
   void fetchHitokoto();
 
     try {
-        const response = await fetch('/api/version');
+        // 使用后端 API 获取版本 (路由: /api/auth/version)
+        const response = await fetch('/api/auth/version');
         if (response.ok) {
-            const data = await response.json();
-            appVersion.value = 'v' + data.version;
+            const result = await response.json();
+            // 适配 ApiResponse 格式：{ data: { version: "x.x.x" } }
+            const version = result?.data?.version || result?.version;
+            appVersion.value = 'v' + version;
         } else {
           appVersion.value = 'v2.2.1'; // Fallback
         }
@@ -175,6 +192,7 @@ onMounted(async () => {
 .github-link {
   text-decoration: none !important;
   display: inline-flex;
+
   align-items: center;
   gap: 0.35rem;
   line-height: 1;

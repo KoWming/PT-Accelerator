@@ -65,50 +65,34 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
-import { useRouter } from 'vue-router';
-import { useAuthStore } from '../stores/auth';
-import axios from '../api/axios';
+import { computed, ref } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
+import { useAuthStore } from '@/stores/auth';
+import { useAuthRedirect } from '@/composables/useAuthRedirect';
 
 const username = ref('');
 const password = ref('');
 const error = ref('');
 const loading = ref(false);
-const csrfToken = ref('');
 
+const route = useRoute();
 const router = useRouter();
 const authStore = useAuthStore();
-
-onMounted(async () => {
-  try {
-    const response = await axios.get('/csrf');
-    csrfToken.value = response.data.token;
-  } catch (e) {
-    console.error('Failed to fetch CSRF token', e);
-  }
-});
+const routeRef = computed(() => route);
+const { redirectTarget } = useAuthRedirect(routeRef);
 
 const handleLogin = async () => {
   loading.value = true;
   error.value = '';
 
   try {
-    const formData = new FormData();
-    formData.append('username', username.value);
-    formData.append('password', password.value);
-    formData.append('csrf_token', csrfToken.value);
-
-    await authStore.login(formData);
-    router.push('/');
+    await authStore.login({
+      username: username.value,
+      password: password.value
+    });
+    router.push(redirectTarget.value);
   } catch (e: any) {
     error.value = '用户名或密码错误';
-    // Refresh CSRF token on failure
-    try {
-        const response = await axios.get('/csrf');
-        csrfToken.value = response.data.token;
-    } catch (err) {
-        console.error('Failed to refresh CSRF token', err);
-    }
   } finally {
     loading.value = false;
   }

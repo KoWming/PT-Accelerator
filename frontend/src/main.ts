@@ -9,9 +9,9 @@ import 'bootstrap/dist/js/bootstrap.bundle.min.js'
 import 'bootstrap-icons/font/bootstrap-icons.css'
 import 'boxicons/css/boxicons.min.css'
 import 'vue-toastification/dist/index.css'
-import './style.css'
-import './assets/theme.css'
-import './assets/theme-sneat.css'
+import './assets/styles/main.scss'
+import './assets/styles/theme.css'
+import './assets/styles/theme-sneat.css'
 
 import Toast, { type PluginOptions, POSITION } from 'vue-toastification'
 
@@ -42,4 +42,7 @@ app.use(createPinia())
 app.use(router)
 app.use(Toast, options)
 
-app.mount('#app')
+router.isReady().then(() => {
+    app.mount('#app')
+})
+

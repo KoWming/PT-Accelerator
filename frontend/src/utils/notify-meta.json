@@ -1,0 +1,141 @@
+{
+  "aliases": {
+    "wecom": "wecom_bot",
+    "dingtalk": "dingding"
+  },
+  "commonFields": [
+    "HITOKOTO"
+  ],
+  "types": [
+    {
+      "type": "wecom_bot",
+      "label": "企业微信机器人",
+      "fields": ["QYWX_KEY"],
+      "icon": "bx bx-message-dots",
+      "chipClass": "settings-chip-success"
+    },
+    {
+      "type": "wecom_app",
+      "label": "企业微信应用",
+      "fields": ["QYWX_AM", "QYWX_ORIGIN"],
+      "icon": "bx bx-buildings",
+      "chipClass": "settings-chip-success"
+    },
+    {
+      "type": "telegram",
+      "label": "Telegram",
+      "fields": ["TG_BOT_TOKEN", "TG_USER_ID", "TG_API_HOST", "TG_PROXY_HOST", "TG_PROXY_PORT", "TG_PROXY_AUTH"],
+      "icon": "bx bxl-telegram",
+      "chipClass": "settings-chip-primary"
+    },
+    {
+      "type": "igot",
+      "label": "iGot 聚合推送",
+      "fields": ["IGOT_PUSH_KEY"],
+      "icon": "bx bx-key",
+      "chipClass": "settings-chip-primary"
+    },
+    {
+      "type": "dingding",
+      "label": "钉钉",
+      "fields": ["DD_BOT_TOKEN", "DD_BOT_SECRET"],
+      "icon": "bx bx-chat",
+      "chipClass": "settings-chip-info"
+    },
+    {
+      "type": "feishu",
+      "label": "飞书",
+      "fields": ["FSKEY"],
+      "icon": "bx bx-paper-plane",
+      "chipClass": "settings-chip-info"
+    },
+    {
+      "type": "smtp",
+      "label": "邮件 (SMTP)",
+      "fields": ["SMTP_SERVER", "SMTP_SSL", "SMTP_EMAIL", "SMTP_PASSWORD", "SMTP_NAME"],
+      "icon": "bx bx-envelope",
+      "chipClass": "settings-chip-warning"
+    },
+    {
+      "type": "bark",
+      "label": "Bark",
+      "fields": ["BARK_PUSH", "BARK_SOUND", "BARK_GROUP", "BARK_ICON", "BARK_LEVEL", "BARK_URL", "BARK_ARCHIVE"],
+      "icon": "bx bx-megaphone",
+      "chipClass": "settings-chip-teal"
+    },
+    {
+      "type": "serverj",
+      "label": "Server酱",
+      "fields": ["PUSH_KEY"],
+      "icon": "bx bx-bell-plus",
+      "chipClass": "settings-chip-warning"
+    },
+    {
+      "type": "chat",
+      "label": "Synology Chat",
+      "fields": ["CHAT_URL", "CHAT_TOKEN"],
+      "icon": "bx bx-message-square-dots",
+      "chipClass": "settings-chip-info"
+    },
+    {
+      "type": "mediasaber",
+      "label": "Media Saber",
+      "fields": ["MEDIASABER_HOST", "MEDIASABER_APIKEY"],
+      "icon": "bx bx-tv",
+      "chipClass": "settings-chip-teal"
+    },
+    {
+      "type": "slack",
+      "label": "Slack",
+      "fields": ["SLACK_WEBHOOK_URL"],
+      "icon": "bx bxl-slack",
+      "chipClass": "settings-chip-info"
+    },
+    {
+      "type": "webhook",
+      "label": "自定义 Webhook",
+      "fields": ["WEBHOOK_URL", "WEBHOOK_METHOD", "WEBHOOK_CONTENT_TYPE", "WEBHOOK_HEADERS", "WEBHOOK_BODY"],
+      "icon": "bx bx-link-alt",
+      "chipClass": "settings-chip-neutral"
+    }
+  ],
+  "guideGroups": [
+    {
+      "title": "企业微信机器人 / 企业微信应用",
+      "chipClass": "settings-chip-success",
+      "description": "支持 13 种通知渠道，类型与字段定义统一来自共享元数据；后续新增或调整渠道时，前后端会同步读取这里。",
+      "types": ["wecom_bot", "wecom_app"]
+    },
+    {
+      "title": "Telegram / iGot",
+      "chipClass": "settings-chip-primary",
+      "description": "Telegram 支持 Bot Token、用户 ID 与代理配置；iGot 只需填写 PUSH_KEY 即可推送。",
+      "types": ["telegram", "igot"]
+    },
+    {
+      "title": "邮件 (SMTP) / Server酱",
+      "chipClass": "settings-chip-warning",
+      "description": "SMTP 按旧项目字段直接配置服务器、邮箱与授权码；Server酱支持旧版和 Turbo 版 PUSH_KEY。",
+      "types": ["smtp", "serverj"]
+    },
+    {
+      "title": "Bark / Media Saber",
+      "chipClass": "settings-chip-teal",
+      "description": "Bark 支持设备码、分组、声音与跳转 URL；Media Saber 需要服务器地址与 API Key。",
+      "types": ["bark", "mediasaber"]
+    },
+    {
+      "title": "钉钉 / 飞书 / Synology Chat / Slack",
+      "chipClass": "settings-chip-info",
+      "description": "办公协作类渠道已兼容旧项目前端的钉钉、飞书、Chat 字段格式，并继续保留 Slack Webhook。",
+      "types": ["dingding", "feishu", "chat", "slack"]
+    },
+    {
+      "title": "自定义 Webhook",
+      "chipClass": "settings-chip-neutral",
+      "description": "支持 POST / GET、自定义 Header 与 Body，可用 $title / $content 作为占位符。",
+      "types": ["webhook"]
+    }
+  ]
+}
+

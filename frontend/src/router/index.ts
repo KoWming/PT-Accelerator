@@ -1,6 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router';
-import { useAuthStore } from '../stores/auth';
-import LoginView from '../views/LoginView.vue';
+import { registerRouterGuards } from './guards';
 
 const router = createRouter({
     history: createWebHistory(import.meta.env.BASE_URL),
@@ -8,38 +7,39 @@ const router = createRouter({
         {
             path: '/login',
             name: 'login',
-            component: LoginView,
+            component: () => import('@/views/LoginView.vue'),
+            meta: { guestOnly: true },
         },
         {
             path: '/',
             name: 'dashboard',
-            component: () => import('../views/DashboardView.vue'),
+            component: () => import('@/views/DashboardView.vue'),
             meta: { requiresAuth: true },
             children: [
                 {
                     path: '',
                     name: 'dashboard-home',
-                    component: () => import('../views/dashboard/Home.vue'),
+                    component: () => import('@/views/HomeView.vue'),
                 },
                 {
                     path: 'trackers',
                     name: 'trackers',
-                    component: () => import('../views/dashboard/Trackers.vue'),
+                    component: () => import('@/views/TrackersView.vue'),
                 },
                 {
                     path: 'hosts',
                     name: 'hosts',
-                    component: () => import('../views/dashboard/Hosts.vue'),
+                    component: () => import('@/views/HostsView.vue'),
                 },
                 {
                     path: 'clients',
                     name: 'clients',
-                    component: () => import('../views/dashboard/Clients.vue'),
+                    component: () => import('@/views/ClientsView.vue'),
                 },
                 {
                     path: 'logs',
                     name: 'logs',
-                    component: () => import('../views/dashboard/Logs.vue'),
+                    component: () => import('@/views/LogsView.vue'),
                 },
                 {
                     path: 'settings',
@@ -48,40 +48,58 @@ const router = createRouter({
                 {
                     path: 'settings/system',
                     name: 'settings-system',
-                    component: () => import('../views/dashboard/Settings.vue'),
+                    component: () => import('@/views/SystemView.vue'),
                 },
+                {
+                    path: 'settings/about',
+                    name: 'settings-about',
+                    component: () => import('@/views/AboutView.vue'),
+                },
+
                 {
                     path: 'settings/notification',
                     name: 'settings-notification',
-                    component: () => import('../views/dashboard/Settings.vue'),
+                    component: () => import('@/views/NotifyView.vue'),
                 },
+
                 {
                     path: 'settings/backup',
                     name: 'settings-backup',
-                    component: () => import('../views/dashboard/Settings.vue'),
+                    component: () => import('@/views/BackupView.vue'),
                 },
+                {
+                    path: 'settings/cfst',
+                    name: 'settings-cfst',
+                    component: () => import('@/views/CfstView.vue'),
+                },
+
+                {
+                    path: 'settings/test',
+                    redirect: '/settings/cfst',
+                },
+                {
+                    path: 'settings/ikuai-dns',
+                    name: 'settings-ikuai-dns',
+                    component: () => import('@/views/IkuaiView.vue'),
+                },
+
+                {
+                    path: 'settings/mihosts',
+                    name: 'settings-mihosts',
+                    component: () => import('@/views/MiHostsView.vue'),
+                },
+
             ],
+        },
+        {
+            path: '/:pathMatch(.*)*',
+            redirect: '/',
         },
     ],
 });
 
-router.beforeEach(async (to, _from, next) => {
-    const authStore = useAuthStore();
-
-    if (to.meta.requiresAuth && !authStore.isAuthenticated) {
-        try {
-            await authStore.checkAuth();
-            if (authStore.isAuthenticated) {
-                next();
-            } else {
-                next('/login');
-            }
-        } catch (e) {
-            next('/login');
-        }
-    } else {
-        next();
-    }
-});
+registerRouterGuards(router);
 
 export default router;
+
+
