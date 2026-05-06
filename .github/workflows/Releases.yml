@@ -1,8 +1,15 @@
-name: Build and Publish Docker Image (Docker Hub)
+name: PT-Accelerator 镜像构建与发布
 
 on:
   push:
     branches: [ new ]
+    paths:
+      - 'version.py'
+      - 'main.py'
+      - 'requirements.txt'
+      - 'Dockerfile'
+      - 'app/**'
+      - 'frontend/**'
   workflow_dispatch:
     inputs:
       version:
@@ -15,31 +22,95 @@ permissions:
   contents: read
 
 jobs:
-  docker:
+  detect-changes:
+    name: 检测变更
     runs-on: ubuntu-latest
+    outputs:
+      frontend_changed: ${{ steps.filter.outputs.frontend }}
+      backend_changed: ${{ steps.filter.outputs.backend }}
+      version_changed: ${{ steps.filter.outputs.version }}
+      docker_changed: ${{ steps.filter.outputs.docker }}
+      should_build: ${{ steps.filter.outputs.frontend == 'true' || steps.filter.outputs.backend == 'true' || steps.filter.outputs.version == 'true' || steps.filter.outputs.docker == 'true' }}
     steps:
-      - name: Checkout
+      - name: 检出代码
         uses: actions/checkout@v4
 
-      - name: Set up QEMU
+      - name: 检测变更文件
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            version:
+              - 'version.py'
+            docker:
+              - 'Dockerfile'
+            backend:
+              - 'main.py'
+              - 'requirements.txt'
+              - 'app/**'
+            frontend:
+              - 'frontend/**'
+
+  build-frontend:
+    name: 构建前端
+    needs: [ detect-changes ]
+    if: github.event_name == 'workflow_dispatch' || needs.detect-changes.outputs.frontend_changed == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出前端代码
+        uses: actions/checkout@v4
+
+      - name: 设置 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: 构建前端资源
+        working-directory: ./frontend
+        run: |
+          npm ci
+          npm run build
+
+  docker-setup:
+    name: 构建并推送镜像
+    needs: [ detect-changes, build-frontend ]
+    if: always() && !cancelled() && (github.event_name == 'workflow_dispatch' || needs.detect-changes.outputs.should_build == 'true') && (needs.build-frontend.result == 'success' || needs.build-frontend.result == 'skipped')
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 解析镜像标签
+        id: image_tag
+        shell: bash
+        run: |
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            echo "tag=${{ github.event.inputs.version }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=new" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: 设置 QEMU
         uses: docker/setup-qemu-action@v3
 
-      - name: Set up Docker Buildx
+      - name: 设置 Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Log in to Docker Hub
+      - name: 登录 Docker Hub
         uses: docker/login-action@v3
         with:
           registry: docker.io
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Build and push Dev (multi-arch)
+      - name: 构建并推送 Docker 镜像
         uses: docker/build-push-action@v5
         with:
           context: .
           file: ./Dockerfile
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: docker.io/${{ secrets.DOCKER_USERNAME }}/pt-accelerator:new
+          tags: docker.io/${{ secrets.DOCKER_USERNAME }}/pt-accelerator:${{ steps.image_tag.outputs.tag }}
 
