@@ -170,7 +170,7 @@ version: "3.8"
 
 services:
 	pt-accelerator:
-		image: pt-accelerator:new
+		image: kowming/pt-accelerator:new
 		container_name: pt-accelerator-new
 		restart: unless-stopped
 		ports:
@@ -228,7 +228,7 @@ docker run -d \
 	-v ./config:/app/config \
 	-v ./logs:/app/logs \
 	-v ./cache:/app/cache \
-	pt-accelerator:new
+	kowming/pt-accelerator:new
 ```
 
 如需本地构建镜像，可执行：
