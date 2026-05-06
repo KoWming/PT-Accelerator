@@ -169,26 +169,26 @@ PT-Accelerator-New/
 version: "3.8"
 
 services:
-	pt-accelerator:
-		image: kowming/pt-accelerator:new
-		container_name: pt-accelerator-new
-		restart: unless-stopped
-		ports:
-			- "23333:23333"
-		volumes:
-			- /etc/hosts:/etc/hosts  #必须，用于 Hosts 联动功能
-			- ./CFST:/app/CFST
-			- ./config:/app/config
-			- ./logs:/app/logs
-			- ./cache:/app/cache
-		environment:
-			- APP_PORT=23333
-		healthcheck:
-			test: ["CMD", "curl", "-f", "http://localhost:23333/api/health"]
-			interval: 30s
-			timeout: 10s
-			retries: 3
-			start_period: 10s
+  pt-accelerator:
+    image: kowming/pt-accelerator:new
+    container_name: pt-accelerator-new
+    restart: unless-stopped
+    ports:
+      - "23333:23333"
+    volumes:
+      - /etc/hosts:/etc/hosts  #必须，用于 Hosts 联动功能
+      - ./CFST:/app/CFST
+      - ./config:/app/config
+      - ./logs:/app/logs
+      - ./cache:/app/cache
+    environment:
+      - APP_PORT=23333
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:23333/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
 ```
 
 启动命令：
@@ -234,7 +234,7 @@ docker run -d \
 如需本地构建镜像，可执行：
 
 ```bash
-docker build -t pt-accelerator:new
+docker build -t pt-accelerator:new .
 ```
 
 ### Docker 构建特点
