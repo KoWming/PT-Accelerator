@@ -2463,7 +2463,7 @@ const handleSaveHosts = async () => {
       "actions actions";
     align-items: center;
     gap: 0.8rem;
-    padding: 1rem 0.2rem;
+    padding: 1rem 0.55rem;
   }
 
   .source-col-name {

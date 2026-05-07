@@ -25,10 +25,21 @@
           <section class="settings-auth-toggle-card settings-backup-toggle-card">
             <div class="settings-auth-toggle-copy">
               <span class="settings-field-label">备份状态</span>
-              <strong>启用配置备份</strong>
+              <div class="backup-toggle-title-row">
+                <strong>启用配置备份</strong>
+                <label class="switch settings-auth-switch backup-toggle-switch-mobile" for="backup-enable-mobile">
+                  <input type="checkbox" id="backup-enable-mobile" :checked="backupForm.enable" @change="updateBooleanField('enable', ($event.target as HTMLInputElement).checked)">
+                  <div class="slider">
+                    <div class="circle">
+                      <svg class="cross" xml:space="preserve" style="enable-background:new 0 0 512 512" viewBox="0 0 365.696 365.696" y="0" x="0" height="6" width="6" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" xmlns="http://www.w3.org/2000/svg"><g><path data-original="#000000" fill="currentColor" d="M243.188 182.86 356.32 69.726c12.5-12.5 12.5-32.766 0-45.247L341.238 9.398c-12.504-12.503-32.77-12.503-45.25 0L182.86 122.528 69.727 9.374c-12.5-12.5-32.766-12.5-45.247 0L9.375 24.457c-12.5 12.504-12.5 32.77 0 45.25l113.152 113.152L9.398 295.99c-12.503 12.503-12.503 32.769 0 45.25L24.48 356.32c12.5 12.5 32.766 12.5 45.247 0l113.132-113.132L295.99 356.32c12.503 12.5 32.769 12.5 45.25 0l15.081-15.082c12.5-12.504 12.5-32.77 0-45.25zm0 0"></path></g></svg>
+                      <svg class="checkmark" xml:space="preserve" style="enable-background:new 0 0 512 512" viewBox="0 0 24 24" y="0" x="0" height="10" width="10" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" xmlns="http://www.w3.org/2000/svg"><g><path data-original="#000000" fill="currentColor" d="M9.707 19.121a.997.997 0 0 1-1.414 0l-5.646-5.647a1.5 1.5 0 0 1 0-2.121l.707-.707a1.5 1.5 0 0 1 2.121 0L9 14.171l9.525-9.525a1.5 1.5 0 0 1 2.121 0l.707.707a1.5 1.5 0 0 1 0 2.121z"></path></g></svg>
+                    </div>
+                  </div>
+                </label>
+              </div>
               <p>开启后可配置自动备份任务，并支持手动测试、立即备份与恢复历史版本。</p>
             </div>
-            <label class="switch settings-auth-switch" for="backup-enable">
+            <label class="switch settings-auth-switch backup-toggle-switch-desktop" for="backup-enable">
               <input type="checkbox" id="backup-enable" :checked="backupForm.enable" @change="updateBooleanField('enable', ($event.target as HTMLInputElement).checked)">
               <div class="slider">
                 <div class="circle">
@@ -92,8 +103,8 @@
             </div>
           </transition>
 
-          <div class="settings-backup-actions">
-            <div class="settings-backup-tools">
+          <div class="settings-backup-actions backup-inline-actions">
+            <div class="settings-backup-tools backup-inline-tools">
               <button type="button" class="settings-action-btn settings-action-neutral justify-content-center" @click="$emit('test')" :disabled="testingConnection || !backupForm.webdav_url">
                 <span v-if="testingConnection" class="spinner-border spinner-border-sm me-2"></span>
                 <i v-else class="bx bx-plug me-2"></i>测试连接
@@ -107,13 +118,15 @@
                 <i v-else class="bx bx-reset me-2"></i>备份恢复
               </button>
             </div>
-            <button type="submit" class="settings-save-btn" :disabled="savingBackup">
-              <span>
-                <span v-if="savingBackup" class="spinner-border spinner-border-sm me-2"></span>
-                <i v-else class="bx bx-save"></i>
-                保存设置
-              </span>
-            </button>
+            <div class="backup-save-wrap">
+              <button type="submit" class="settings-save-btn" :disabled="savingBackup">
+                <span>
+                  <span v-if="savingBackup" class="spinner-border spinner-border-sm me-2"></span>
+                  <i v-else class="bx bx-save"></i>
+                  保存设置
+                </span>
+              </button>
+            </div>
           </div>
         </form>
       </div>
@@ -155,3 +168,68 @@ const updateBooleanField = (field: 'enable', value: boolean) => {
   emit('updateField', field, value);
 };
 </script>
+
+<style scoped>
+.backup-toggle-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.backup-toggle-switch-mobile {
+  display: none;
+}
+
+.backup-toggle-switch-desktop {
+  display: inline-flex;
+}
+
+@media (max-width: 767.98px) {
+  .backup-toggle-switch-desktop {
+    display: none;
+  }
+
+  .backup-toggle-switch-mobile {
+    display: inline-flex;
+  }
+
+  .backup-inline-actions {
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.55rem;
+    align-items: stretch;
+  }
+
+  .backup-inline-tools {
+    display: contents;
+  }
+
+  .backup-inline-actions > *,
+  .backup-inline-tools > * {
+    min-width: 0;
+    width: 100% !important;
+  }
+
+  .backup-save-wrap {
+    grid-column: 1 / -1;
+    display: flex;
+    justify-content: stretch;
+    width: 100% !important;
+  }
+
+  .backup-inline-actions .settings-action-btn,
+  .backup-inline-actions .settings-save-btn {
+    min-width: 0;
+    width: 100% !important;
+    padding-inline: 0.65rem;
+    font-size: 0.82rem;
+    justify-content: center;
+  }
+
+  .backup-inline-actions .settings-save-btn {
+    max-width: 100%;
+    width: 100% !important;
+  }
+}
+</style>

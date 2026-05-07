@@ -74,10 +74,26 @@
             <div class="settings-auth-toggle-card settings-backup-toggle-card mb-3">
               <div class="settings-auth-toggle-copy">
                 <span class="settings-field-label">同步开关</span>
-                <strong>启用小米路由器同步</strong>
+                <div class="mihosts-toggle-title-row">
+                  <strong>启用小米路由器同步</strong>
+                  <label class="switch settings-auth-switch mihosts-toggle-switch-mobile" for="mihosts-enable-mobile">
+                    <input
+                      type="checkbox"
+                      id="mihosts-enable-mobile"
+                      :checked="miHostsForm.enable"
+                      @change="miHostsForm.enable = ($event.target as HTMLInputElement).checked"
+                    >
+                    <div class="slider">
+                      <div class="circle">
+                        <svg class="cross" xml:space="preserve" style="enable-background:new 0 0 512 512" viewBox="0 0 365.696 365.696" y="0" x="0" height="6" width="6" xmlns="http://www.w3.org/2000/svg"><g><path data-original="#000000" fill="currentColor" d="M243.188 182.86 356.32 69.726c12.5-12.5 12.5-32.766 0-45.247L341.238 9.398c-12.504-12.503-32.77-12.503-45.25 0L182.86 122.528 69.727 9.374c-12.5-12.5-32.766-12.5-45.247 0L9.375 24.457c-12.5 12.504-12.5 32.77 0 45.25l113.152 113.152L9.398 295.99c-12.503 12.503-12.503 32.769 0 45.25L24.48 356.32c12.5 12.5 32.766 12.5 45.247 0l113.132-113.132L295.99 356.32c12.503 12.5 32.769 12.5 45.25 0l15.081-15.082c12.5-12.504 12.5-32.77 0-45.25zm0 0"></path></g></svg>
+                        <svg class="checkmark" xml:space="preserve" style="enable-background:new 0 0 512 512" viewBox="0 0 24 24" y="0" x="0" height="10" width="10" xmlns="http://www.w3.org/2000/svg"><g><path data-original="#000000" fill="currentColor" d="M9.707 19.121a.997.997 0 0 1-1.414 0l-5.646-5.647a1.5 1.5 0 0 1 0-2.121l.707-.707a1.5 1.5 0 0 1 2.121 0L9 14.171l9.525-9.525a1.5 1.5 0 0 1 2.121 0l.707.707a1.5 1.5 0 0 1 0 2.121z"></path></g></svg>
+                      </div>
+                    </div>
+                  </label>
+                </div>
                 <p>CFST 优选成功后，将 tracker 最优 IP 同步到小米路由器 hosts。</p>
               </div>
-              <label class="switch settings-auth-switch" for="mihosts-enable">
+              <label class="switch settings-auth-switch mihosts-toggle-switch-desktop" for="mihosts-enable">
                 <input
                   type="checkbox"
                   id="mihosts-enable"
@@ -174,7 +190,7 @@
             </div>
 
             <!-- 操作按钮 -->
-            <div class="settings-inline-actions settings-cfst-bottom-actions mt-2">
+            <div class="settings-inline-actions settings-cfst-bottom-actions mt-2 mihosts-inline-actions">
               <button
                 type="button"
                 class="settings-action-btn settings-action-neutral settings-refresh-like-test-btn justify-content-center"
@@ -621,6 +637,33 @@ onMounted(async () => {
   .settings-field-grid-3cols {
     grid-template-columns: 1fr;
   }
+
+  .mihosts-inline-actions {
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: 0.55rem;
+    align-items: stretch;
+  }
+
+  .mihosts-inline-actions.settings-cfst-bottom-actions {
+    flex-direction: row !important;
+    align-items: stretch;
+  }
+
+  .mihosts-inline-actions > *,
+  .mihosts-inline-actions.settings-cfst-bottom-actions > * {
+    min-width: 0;
+    width: auto !important;
+  }
+
+  .mihosts-inline-actions .settings-action-btn,
+  .mihosts-inline-actions .settings-save-btn {
+    width: 100% !important;
+    min-width: 0;
+    padding-inline: 0.65rem;
+    font-size: 0.82rem;
+    justify-content: center;
+  }
 }
 
 /* 小米路由器同步状态 */
@@ -673,6 +716,31 @@ onMounted(async () => {
 
 .settings-inline-note-compact {
   padding: 0.5rem 0.75rem;
+}
+
+.mihosts-toggle-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.mihosts-toggle-switch-mobile {
+  display: none;
+}
+
+.mihosts-toggle-switch-desktop {
+  display: inline-flex;
+}
+
+@media (max-width: 767.98px) {
+  .mihosts-toggle-switch-desktop {
+    display: none;
+  }
+
+  .mihosts-toggle-switch-mobile {
+    display: inline-flex;
+  }
 }
 </style>
 

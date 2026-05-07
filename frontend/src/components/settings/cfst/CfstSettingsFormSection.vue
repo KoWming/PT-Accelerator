@@ -170,7 +170,7 @@
 
       <slot />
 
-      <div class="settings-auth-actions settings-cfst-bottom-actions">
+      <div class="settings-auth-actions settings-cfst-bottom-actions cfst-inline-actions">
         <button type="button" class="settings-action-btn settings-action-neutral settings-refresh-like-test-btn justify-content-center" @click="$emit('refresh-results')" :disabled="loadingCfstResults || runningCfst">
           <span v-if="loadingCfstResults" class="spinner-border spinner-border-sm me-2"></span>
           <i v-else class="bx bx-refresh me-2"></i>刷新结果
@@ -241,3 +241,34 @@ const updateBooleanField = (field: CfstBooleanField, value: boolean) => {
   emit('updateField', field, value);
 };
 </script>
+
+<style scoped>
+@media (max-width: 767.98px) {
+  .cfst-inline-actions {
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: 0.55rem;
+    align-items: stretch;
+  }
+
+  .cfst-inline-actions.settings-cfst-bottom-actions {
+    flex-direction: row !important;
+    align-items: stretch;
+  }
+
+  .cfst-inline-actions > *,
+  .cfst-inline-actions.settings-cfst-bottom-actions > * {
+    min-width: 0;
+    width: auto !important;
+  }
+
+  .cfst-inline-actions .settings-action-btn,
+  .cfst-inline-actions .settings-save-btn {
+    width: 100% !important;
+    min-width: 0;
+    padding-inline: 0.65rem;
+    font-size: 0.82rem;
+    justify-content: center;
+  }
+}
+</style>

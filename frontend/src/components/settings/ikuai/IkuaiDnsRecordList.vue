@@ -745,6 +745,21 @@ const onImportFileChange = (event: Event) => {
     padding: 1rem;
   }
 
+  .ikuai-dns-header-actions {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    width: 100%;
+    gap: 0.5rem;
+  }
+
+  .ikuai-dns-header-btn {
+    width: 100%;
+    min-width: 0;
+    justify-content: center;
+    padding-inline: 0.6rem;
+    font-size: 0.82rem;
+  }
+
   .ikuai-dns-table {
     border-left: 1px solid rgba(161, 172, 184, 0.12);
     border-right: 1px solid rgba(161, 172, 184, 0.12);

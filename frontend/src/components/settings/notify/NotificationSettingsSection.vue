@@ -30,7 +30,7 @@
                 <div class="settings-channel-icon">
                   <i class="bx" :class="getChannelIcon(String(channel.type))"></i>
                 </div>
-                <div class="flex-grow-1 min-width-0">
+                <div class="flex-grow-1 min-width-0 settings-channel-content">
                   <div class="d-flex justify-content-between align-items-center mb-1 gap-2">
                     <h6 class="mb-0 fw-semibold text-break me-2">{{ channel.name }}</h6>
                     <div class="flex-shrink-0 ps-2 d-md-none">
@@ -46,12 +46,12 @@
                     </div>
                   </div>
 
-                  <div class="d-flex align-items-center flex-wrap gap-2 small text-muted">
-                    <div class="d-flex gap-2 align-items-center">
+                  <div class="settings-channel-meta small text-muted">
+                    <div class="settings-channel-meta-tags">
                       <span class="settings-chip" :class="getChannelChipClass(String(channel.type))">{{ getChannelTypeLabel(String(channel.type)) }}</span>
                       <span v-if="channel.HITOKOTO" class="settings-chip settings-chip-primary">一言</span>
                     </div>
-                    <span class="text-truncate d-inline-block" style="max-width: 100%;">{{ getChannelSummary(channel) }}</span>
+                    <span v-if="getChannelSummary(channel) !== null" class="settings-channel-summary text-truncate">{{ getChannelSummary(channel) }}</span>
                   </div>
                 </div>
               </div>
@@ -141,39 +141,54 @@ defineEmits<{
 const getChannelIcon = (type: string) => getNotifyTypeIcon(type).replace(/^bx\s+/, '');
 const getChannelChipClass = (type: string) => getNotifyTypeChipClass(type);
 const getChannelTypeLabel = (type: string) => getNotifyTypeLabel(type);
+const getChannelField = (channel: NotifyChannel, field: string): unknown => channel[field] ?? channel.config?.[field];
 
-const getChannelSummary = (channel: NotifyChannel) => {
+const pickText = (...values: unknown[]): string => {
+  for (const value of values) {
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      if (trimmed) {
+        return trimmed;
+      }
+    }
+  }
+  return '';
+};
+
+const getChannelSummary = (channel: NotifyChannel): string | null => {
   const type = normalizeNotifyType(String(channel.type || ''));
 
   switch (type) {
+    case 'wecom_bot':
+      return pickText(getChannelField(channel, 'QYWX_KEY')) || '未配置企业微信机器人 Key';
+    case 'wecom_app':
+      return pickText(getChannelField(channel, 'QYWX_AM')) || '未配置企业微信应用参数';
+    case 'dingding':
+      return pickText(getChannelField(channel, 'DD_BOT_TOKEN'), getChannelField(channel, 'DD_BOT_SECRET')) || '未配置钉钉参数';
+    case 'smtp':
+      return pickText(getChannelField(channel, 'SMTP_EMAIL'), getChannelField(channel, 'SMTP_SERVER')) || '未配置邮箱地址';
+    case 'serverj':
+      return pickText(getChannelField(channel, 'PUSH_KEY')) || '未配置 Server酱 PUSH_KEY';
+    case 'igot':
+      return pickText(getChannelField(channel, 'IGOT_PUSH_KEY')) || '未配置 iGot Push Key';
+    case 'chat':
+      return pickText(getChannelField(channel, 'CHAT_URL'), getChannelField(channel, 'CHAT_TOKEN')) || '未配置 Synology Chat 参数';
+    case 'slack':
+      return pickText(getChannelField(channel, 'SLACK_WEBHOOK_URL')) || '未配置 Slack Webhook';
+    case 'mediasaber':
+      return pickText(getChannelField(channel, 'MEDIASABER_HOST'), getChannelField(channel, 'MEDIASABER_APIKEY')) || '未配置 Media Saber 参数';
     case 'bark':
-      return channel.BARK_PUSH || channel.BARK_URL || '未配置 Bark 地址';
+      return pickText(getChannelField(channel, 'BARK_PUSH'), getChannelField(channel, 'BARK_URL')) || '未配置 Bark 地址';
     case 'pushplus':
-      return channel.PUSH_PLUS_TOKEN || '未配置 PushPlus Token';
-    case 'serverchan':
-      return channel.SCTKEY || channel.SENDKEY || '未配置 Server 酱密钥';
+      return pickText(getChannelField(channel, 'PUSH_PLUS_TOKEN')) || '未配置 PushPlus Token';
     case 'telegram':
-      return [channel.TELEGRAM_CHAT_ID, channel.TELEGRAM_BOT_TOKEN].filter(Boolean).join(' / ') || '未配置 Telegram 参数';
-    case 'dingtalk':
-      return channel.DINGTALK_WEBHOOK || '未配置钉钉 Webhook';
-    case 'wecom':
-      return channel.QYWX_AM || channel.QYWX_KEY || '未配置企业微信参数';
+      return [pickText(getChannelField(channel, 'TG_USER_ID')), pickText(getChannelField(channel, 'TG_BOT_TOKEN'))].filter(Boolean).join(' / ') || '未配置 Telegram 参数';
     case 'feishu':
-      return channel.FEISHU_WEBHOOK || '未配置飞书 Webhook';
-    case 'gotify':
-      return channel.GOTIFY_URL || channel.GOTIFY_TOKEN || '未配置 Gotify 参数';
-    case 'ntfy':
-      return channel.NTFY_URL || channel.NTFY_TOPIC || '未配置 Ntfy 参数';
-    case 'pushdeer':
-      return channel.PUSHDEER_KEY || '未配置 PushDeer Key';
-    case 'email':
-      return channel.EMAIL_HOST || channel.EMAIL_TO || '未配置邮件参数';
-    case 'discord':
-      return channel.DISCORD_WEBHOOK || '未配置 Discord Webhook';
+      return pickText(getChannelField(channel, 'FSKEY')) || '未配置飞书 Webhook';
     case 'webhook':
-      return channel.WEBHOOK_URL || '未配置 Webhook 地址';
+      return pickText(getChannelField(channel, 'WEBHOOK_URL')) || '未配置 Webhook 地址';
     default:
-      return channel.remark || channel.description || '暂无摘要';
+      return pickText(channel.remark, channel.description) || null;
   }
 };
 </script>

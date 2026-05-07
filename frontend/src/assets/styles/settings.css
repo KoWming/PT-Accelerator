@@ -318,21 +318,22 @@
 }
 
 .settings-cfst-card .settings-card-heading > p {
-  color: color-mix(in srgb, var(--text-muted) 78%, transparent);
+  color: var(--text-muted);
+  opacity: 0.78;
 }
 
 .settings-cfst-card .settings-cfst-overview-card p {
-  color: color-mix(in srgb, var(--text-muted) 82%, transparent);
+  color: rgba(128, 128, 128, 0.82);
 }
 
 .settings-cfst-card .settings-block-heading p,
 .settings-cfst-card .settings-cfst-runtime-header p {
-  color: color-mix(in srgb, var(--text-muted) 76%, transparent);
+  color: rgba(128, 128, 128, 0.61);
 }
 
 .settings-cfst-card .settings-field-hint,
 .settings-cfst-card .settings-check-card small {
-  color: color-mix(in srgb, var(--text-muted) 72%, transparent);
+  color: rgba(128, 128, 128, 0.58);
 }
 
 .settings-cfst-card .settings-field-hint a {
@@ -366,15 +367,15 @@
 
 
 .settings-cfst-card .settings-inline-note-text {
-  color: color-mix(in srgb, #0dcaf0 72%, rgba(255, 255, 255, 0.28));
+  color: rgba(13, 202, 240, 0.74);
 }
 
 .settings-cfst-card .settings-inline-note-title {
-  color: color-mix(in srgb, #0dcaf0 88%, #ffffff 12%);
+  color: #0dcaf0;
 }
 
 .settings-cfst-card .settings-field-label {
-  color: color-mix(in srgb, var(--text-muted) 68%, transparent);
+  color: rgba(128, 128, 128, 0.55);
 }
 
 .settings-toolbar-btn {
@@ -426,6 +427,13 @@
   border-radius: 0.95rem;
   border: 1px solid var(--border-color);
   background: var(--bg-surface-alt);
+  overflow: hidden;
+}
+
+.settings-channel-content {
+  min-width: 0;
+  width: 100%;
+  overflow: hidden;
 }
 
 .settings-channel-icon {
@@ -444,6 +452,52 @@
 
 .settings-channel-actions {
   flex-wrap: wrap;
+}
+
+.settings-channel-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.45rem;
+  min-width: 0;
+  width: 100%;
+  overflow: hidden;
+}
+
+.settings-channel-meta-tags {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  max-width: 100%;
+}
+
+.settings-channel-summary {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  color: inherit;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+  line-height: 1.4;
+}
+
+@media (max-width: 767.98px) {
+  .settings-channel-meta {
+    gap: 0.45rem;
+  }
+
+  .settings-channel-summary {
+    display: block !important;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap !important;
+  }
 }
 
 .settings-chip {
@@ -1117,6 +1171,7 @@
 
 .settings-backup-modal {
   background: rgba(15, 23, 42, 0.42);
+  -webkit-backdrop-filter: blur(4px);
   backdrop-filter: blur(4px);
 }
 

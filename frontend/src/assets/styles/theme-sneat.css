@@ -14,6 +14,7 @@
   --primary-color: #5dade2;
   --primary-rgb: 93, 173, 226;
   --primary-hover: #4a9fd4;
+  --primary-focus: #6db5e5;
   --secondary-color: #9aa5b5;
   --success-color: #6cc9b0;
   --danger-color: #f48fb1;
@@ -201,8 +202,8 @@ main {
   margin: 0 -1.5rem 1.5rem;
   padding: 0 1.5rem;
   background: var(--bg-header);
-  backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
   border-bottom: 1px solid var(--divider-color);
 }
 
@@ -241,7 +242,6 @@ main {
 .settings-tabs {
   position: relative;
   overflow-x: auto;
-  scrollbar-width: none;
 }
 
 .settings-tabs::-webkit-scrollbar {
@@ -316,7 +316,7 @@ textarea.form-control {
 
 .form-control::placeholder,
 textarea.form-control::placeholder {
-  color: color-mix(in srgb, var(--text-muted) 78%, transparent);
+  color: rgba(var(--text-muted-rgb), 0.78);
 }
 
 .form-control:focus,
@@ -394,8 +394,8 @@ textarea.form-control:focus {
 .btn-primary:hover,
 .save-config-btn:hover,
 .animated-button-primary:hover {
-  background: color-mix(in srgb, var(--primary-color) 92%, #ffffff 8%);
-  border-color: color-mix(in srgb, var(--primary-color) 92%, #ffffff 8%);
+  background: rgba(93, 173, 226, 0.92);
+  border-color: rgba(93, 173, 226, 0.92);
   box-shadow: 0 0.16rem 0.38rem rgba(var(--primary-rgb), 0.14);
 }
 
@@ -405,8 +405,8 @@ textarea.form-control:focus {
 .save-config-btn:active,
 .animated-button-primary:focus,
 .animated-button-primary:active {
-  background: color-mix(in srgb, var(--primary-color) 90%, #ffffff 10%);
-  border-color: color-mix(in srgb, var(--primary-color) 90%, #ffffff 10%);
+  background: var(--primary-focus);
+  border-color: var(--primary-focus);
   box-shadow: none;
 }
 
@@ -420,8 +420,8 @@ textarea.form-control:focus {
 
 .btn-success:hover,
 .animated-button-secondary:hover {
-  background: color-mix(in srgb, var(--success-color) 92%, #ffffff 8%);
-  border-color: color-mix(in srgb, var(--success-color) 92%, #ffffff 8%);
+  background: #7dd4c1;
+  border-color: #7dd4c1;
   box-shadow: 0 0.16rem 0.38rem rgba(108, 201, 176, 0.14);
 }
 
@@ -435,8 +435,8 @@ textarea.form-control:focus {
 
 .btn-danger:hover,
 .animated-button-danger:hover {
-  background: color-mix(in srgb, var(--danger-color) 92%, #ffffff 8%);
-  border-color: color-mix(in srgb, var(--danger-color) 92%, #ffffff 8%);
+  background: #f5a2c7;
+  border-color: #f5a2c7;
   box-shadow: 0 0.16rem 0.38rem rgba(244, 143, 177, 0.14);
 }
 
@@ -448,8 +448,8 @@ textarea.form-control:focus {
 }
 
 .btn-warning:hover {
-  background: color-mix(in srgb, var(--warning-color) 94%, #ffffff 6%);
-  border-color: color-mix(in srgb, var(--warning-color) 94%, #ffffff 6%);
+  background: #f7d394;
+  border-color: #f7d394;
   box-shadow: 0 0.16rem 0.38rem rgba(245, 196, 122, 0.14);
 }
 
@@ -461,8 +461,8 @@ textarea.form-control:focus {
 }
 
 .btn-info:hover {
-  background: color-mix(in srgb, var(--info-color) 94%, #ffffff 6%);
-  border-color: color-mix(in srgb, var(--info-color) 94%, #ffffff 6%);
+  background: #9ee0fd;
+  border-color: #9ee0fd;
   box-shadow: 0 0.16rem 0.38rem rgba(125, 211, 252, 0.14);
 }
 
@@ -474,15 +474,15 @@ textarea.form-control:focus {
 }
 
 .btn-action-primary:hover {
-  background: color-mix(in srgb, var(--primary-color) 92%, #ffffff 8%);
-  border-color: color-mix(in srgb, var(--primary-color) 92%, #ffffff 8%);
+  background: #75b9eb;
+  border-color: #75b9eb;
   box-shadow: 0 0.16rem 0.38rem rgba(var(--primary-rgb), 0.14);
 }
 
 .btn-action-primary:focus,
 .btn-action-primary:active {
-  background: color-mix(in srgb, var(--primary-color) 90%, #ffffff 10%);
-  border-color: color-mix(in srgb, var(--primary-color) 90%, #ffffff 10%);
+  background: #6db5e5;
+  border-color: #6db5e5;
   box-shadow: none;
 }
 
@@ -493,7 +493,7 @@ textarea.form-control:focus {
 }
 
 .btn-primary-soft:hover {
-  background: color-mix(in srgb, var(--bg-soft-primary) 82%, #ffffff 18%);
+  background: #c6deef;
   border-color: rgba(var(--primary-rgb), 0.24);
   color: var(--primary-color);
   box-shadow: 0 0.14rem 0.32rem rgba(var(--primary-rgb), 0.1);
@@ -654,6 +654,7 @@ textarea.form-control:focus {
 
 .bg-dark-glass {
   background: var(--bg-surface-alt) !important;
+  -webkit-backdrop-filter: blur(10px);
   backdrop-filter: blur(10px);
 }
 
@@ -680,7 +681,7 @@ textarea.form-control:focus {
 .switch {
   --switch-width: 38px;
   --switch-height: 22px;
-  --switch-bg: color-mix(in srgb, var(--secondary-color) 45%, var(--bg-surface-alt));
+  --switch-bg: #b4b7c3;
   --switch-checked-bg: var(--success-color);
   --switch-offset: calc((var(--switch-height) - var(--circle-diameter)) / 2);
   --switch-transition: all .2s cubic-bezier(0.27, 0.2, 0.25, 1.51);
@@ -796,6 +797,7 @@ textarea.form-control:focus {
 
 .modal {
   background: var(--bg-overlay);
+  -webkit-backdrop-filter: blur(6px);
   backdrop-filter: blur(6px);
 }
 
@@ -807,6 +809,7 @@ textarea.form-control:focus {
   align-items: center;
   justify-content: center;
   z-index: 1060;
+  -webkit-backdrop-filter: blur(6px);
   backdrop-filter: blur(6px);
 }
 
@@ -845,7 +848,7 @@ textarea.form-control:focus {
   justify-content: flex-end;
   gap: 0.75rem;
   border-top: 1px solid var(--divider-color);
-  background: color-mix(in srgb, var(--bg-surface-alt) 72%, transparent);
+  background: rgba(248, 248, 252, 0.72);
 }
 
 .modal-title-custom {
@@ -884,8 +887,8 @@ textarea.form-control:focus {
 }
 
 .btn-secondary-custom {
-  background: color-mix(in srgb, var(--bg-surface-alt) 84%, #ffffff 16%);
-  border-color: color-mix(in srgb, var(--border-color) 88%, #ffffff 12%);
+  background: #fafafe;
+  border-color: #e0e3e8;
   color: #6f8092;
 }
 
@@ -901,15 +904,15 @@ textarea.form-control:focus {
 }
 
 .btn-secondary-custom:hover {
-  background: color-mix(in srgb, var(--bg-soft-primary) 40%, var(--bg-surface-alt));
+  background: #f4f7fb;
   border-color: rgba(var(--primary-rgb), 0.22);
   color: var(--primary-color);
   box-shadow: 0 0.12rem 0.28rem rgba(var(--primary-rgb), 0.06);
 }
 
 .btn-primary-custom:hover {
-  background: color-mix(in srgb, var(--primary-color) 92%, #ffffff 8%);
-  border-color: color-mix(in srgb, var(--primary-color) 92%, #ffffff 8%);
+  background: #75b9eb;
+  border-color: #75b9eb;
   box-shadow: 0 0.16rem 0.38rem rgba(var(--primary-rgb), 0.14);
 }
 

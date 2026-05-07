@@ -254,7 +254,7 @@ DEFAULT_CONFIG: dict = {
 
 
     "app": {
-        "version": "3.0.0",
+        "version": "3.0.1",
         "debug": False,
     },
     "auth": {
@@ -472,13 +472,13 @@ class ConfigManager:
         return result
 
     @staticmethod
-    def _deep_copy(data: dict) -> dict:
-        """递归复制字典"""
+    def _deep_copy(data: Any) -> Any:
+        """递归复制字典、列表及基础值。"""
         if isinstance(data, dict):
             return {k: ConfigManager._deep_copy(v) for k, v in data.items()}
         elif isinstance(data, list):
             return [ConfigManager._deep_copy(item) for item in data]
-        else:  # type: ignore[unreachable]
+        else:
             return data
 
     @staticmethod

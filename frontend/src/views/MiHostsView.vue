@@ -132,7 +132,7 @@
           </div>
 
           <!-- 操作按钮 -->
-          <div class="settings-inline-actions settings-cfst-bottom-actions mt-2">
+          <div class="settings-inline-actions settings-cfst-bottom-actions mt-2 mihosts-inline-actions">
             <button
               type="button"
               class="settings-action-btn settings-action-neutral settings-refresh-like-test-btn justify-content-center"
@@ -327,5 +327,37 @@ onMounted(async () => {
 .mihosts-view-btn:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+}
+
+@media (max-width: 767.98px) {
+  .mihosts-inline-actions {
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: 0.55rem;
+    align-items: stretch;
+  }
+
+  .mihosts-inline-actions > * {
+    min-width: 0;
+    width: auto !important;
+  }
+
+  .mihosts-inline-actions .settings-action-btn,
+  .mihosts-inline-actions .settings-save-btn {
+    width: 100% !important;
+    min-width: 0;
+    padding-inline: 0.65rem;
+    font-size: 0.82rem;
+    justify-content: center;
+  }
+
+  .mihosts-inline-actions.settings-cfst-bottom-actions {
+    flex-direction: row !important;
+    align-items: stretch;
+  }
+
+  .mihosts-inline-actions.settings-cfst-bottom-actions > * {
+    width: auto !important;
+  }
 }
 </style>

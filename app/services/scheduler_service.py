@@ -113,6 +113,7 @@ def _validate_trigger(trigger: str, interval_seconds: int, cron_expr: Optional[s
             day=fields[2],
             month=fields[3],
             day_of_week=fields[4],
+            timezone="Asia/Shanghai",
         ))
 
     else:

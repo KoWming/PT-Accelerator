@@ -2,9 +2,6 @@
   <div class="dashboard-redesign">
     <div class="page-header">
       <h2 class="page-title">Tracker 管理</h2>
-      <Teleport to="#mobile-header-actions" :disabled="!isMobile">
-        <div class="page-header-actions" v-if="isMobile || true"></div>
-      </Teleport>
     </div>
 
     <section class="trackers-layout">
@@ -406,7 +403,6 @@
 <script setup lang="ts">
 import { ref, onMounted, reactive, computed } from 'vue';
 import { useTrackerStore, type Tracker } from '@/stores/modules/trackers';
-import { useMobile } from '@/composables/useMobile';
 import { useToast } from '@/composables/useToast';
 import { useConfirm } from '@/composables/useConfirm';
 import { getErrorMessage } from '@/utils/error';
@@ -431,7 +427,6 @@ const normalizeDomain = (value: string) => {
 };
 
 const store = useTrackerStore();
-const { isMobile } = useMobile();
 const toast = useToast();
 const { confirm } = useConfirm();
 const isAddTrackerModalOpen = ref(false);
@@ -873,12 +868,23 @@ const handleDeleteCloudflareDomain = async (domain: string) => {
   .tracker-view-tabs {
     width: 100%;
     justify-content: stretch;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
   }
 
   .tracker-view-tab {
-    flex: 1 1 100%;
+    flex: 1 1 0;
     min-width: 0;
+    padding-inline: 0.75rem;
+  }
+
+  .tracker-view-tab-main {
+    gap: 0.35rem;
+  }
+
+  .tracker-view-tab-main span:last-child {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 }
 
@@ -1435,6 +1441,34 @@ const handleDeleteCloudflareDomain = async (domain: string) => {
     border-bottom: none;
   }
 
+  .tracker-cloudflare-table td:last-child {
+    width: 100%;
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    padding-top: 0;
+    padding-left: 1rem;
+    padding-right: 1rem;
+    text-align: right;
+  }
+
+  .tracker-cloudflare-table td:first-child {
+    max-width: none;
+    overflow: visible;
+    text-overflow: initial;
+    white-space: normal;
+  }
+
+  .tracker-cloudflare-domain-cell {
+    display: flex;
+    justify-content: flex-start;
+    width: 100%;
+    max-width: none;
+    text-align: left;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
   .tracker-cloudflare-domain,
   .tracker-cloudflare-actions {
 
@@ -1444,10 +1478,14 @@ const handleDeleteCloudflareDomain = async (domain: string) => {
 
   .tracker-cloudflare-actions {
     padding-top: 0;
+    display: flex;
+    width: 100%;
+    justify-content: flex-end;
+    text-align: right;
   }
 
   .tracker-cloudflare-delete-btn {
-    width: 100%;
+    width: auto;
   }
 }
 
@@ -2483,7 +2521,7 @@ const handleDeleteCloudflareDomain = async (domain: string) => {
       "network network"
       "actions actions";
     gap: 0.8rem;
-    padding: 1rem 0.2rem;
+    padding: 1rem 0.55rem;
   }
 
   .tracker-col-name {
@@ -2582,6 +2620,56 @@ const handleDeleteCloudflareDomain = async (domain: string) => {
     flex-direction: column;
   }
 
+  .tracker-whitelist-input-row-inline {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .tracker-whitelist-input-row-inline .tracker-input-group-flex {
+    width: 100%;
+  }
+
+  .tracker-whitelist-input-row-inline .tracker-whitelist-add-btn,
+  .tracker-whitelist-input-row-inline .tracker-cloudflare-refresh-btn {
+    flex: 1 1 0;
+    width: auto;
+    min-width: 0;
+    padding-inline: 0.7rem;
+    font-size: 0.82rem;
+    gap: 0.28rem;
+  }
+
+  .tracker-whitelist-input-row-inline .tracker-cloudflare-refresh-btn {
+    justify-content: center;
+  }
+
+  .tracker-whitelist-input-row-inline .tracker-whitelist-add-btn + .tracker-cloudflare-refresh-btn {
+    margin-top: 0;
+  }
+
+  .tracker-whitelist-input-row-inline .tracker-whitelist-add-btn,
+  .tracker-whitelist-input-row-inline .tracker-cloudflare-refresh-btn {
+    width: 100%;
+  }
+
+  .tracker-whitelist-input-row-inline .tracker-whitelist-add-btn,
+  .tracker-whitelist-input-row-inline .tracker-cloudflare-refresh-btn {
+    max-width: none;
+  }
+
+  .tracker-whitelist-input-row-inline:has(.tracker-whitelist-add-btn) {
+    gap: 0.7rem;
+  }
+
+  .tracker-whitelist-input-row-inline {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .tracker-whitelist-input-row-inline .tracker-input-group-flex {
+    grid-column: 1 / -1;
+  }
+
   .tracker-whitelist-add-btn {
     width: 100%;
   }
@@ -2606,7 +2694,11 @@ const handleDeleteCloudflareDomain = async (domain: string) => {
 
   .tracker-secondary-actions {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    justify-content: center;
+    justify-content: stretch;
+  }
+
+  .tracker-secondary-actions .tracker-mini-danger {
+    grid-column: 1 / -1;
   }
 
   .tracker-side-button {
@@ -2621,6 +2713,15 @@ const handleDeleteCloudflareDomain = async (domain: string) => {
 
   .tracker-mini-action {
     justify-content: center;
+    width: 100%;
+    min-height: 3rem;
+    padding-inline: 0.7rem;
+    font-size: 0.82rem;
+    gap: 0.35rem;
+  }
+
+  .tracker-ip-submit {
+    margin-left: 0;
   }
 
   .tracker-ip-prefix {
@@ -2647,7 +2748,7 @@ const handleDeleteCloudflareDomain = async (domain: string) => {
       "network network"
       "actions actions";
     gap: 0.8rem;
-    padding: 1rem 0.2rem;
+    padding: 1rem 0.55rem;
   }
 
   .tracker-col-name {

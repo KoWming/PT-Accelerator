@@ -105,8 +105,8 @@ a {
 /* Bootstrap Overrides - Cards */
 .card {
   background: var(--glass-bg);
-  backdrop-filter: var(--glass-backdrop);
   -webkit-backdrop-filter: var(--glass-backdrop);
+  backdrop-filter: var(--glass-backdrop);
   border: 1px solid var(--glass-border);
   border-radius: 1rem;
   box-shadow: var(--shadow-md);
@@ -176,6 +176,7 @@ body.light-theme .btn-close {
 
 .bg-dark-glass {
   background: var(--bg-surface);
+  -webkit-backdrop-filter: blur(8px);
   backdrop-filter: blur(8px);
 }
 
@@ -327,8 +328,8 @@ body.light-theme .nav-link.active {
   top: 0;
   z-index: 999;
   background: var(--bg-header);
-  backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(20px);
   margin: 0 -1.5rem 1.5rem -1.5rem;
   padding: 0 1.5rem;
   height: 65px;
@@ -531,8 +532,8 @@ body.light-theme .nav-link.active {
   top: 0;
   z-index: 999;
   background: var(--bg-header);
-  backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(20px);
   margin: 0 -1.5rem 1.5rem -1.5rem;
   padding: 0 1.5rem;
   height: 65px;
@@ -638,8 +639,8 @@ body.light-theme .nav-link.active {
   top: 0;
   z-index: 999;
   background: var(--bg-header);
-  backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(20px);
   margin: 0 -1.5rem 1.5rem -1.5rem;
   padding: 0 1.5rem;
   height: 65px;
@@ -2565,8 +2566,8 @@ body.light-theme .form-select:disabled {
 /* Dropdowns */
 .dropdown-menu {
   background-color: var(--bg-surface);
-  backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(20px);
   border: 1px solid var(--glass-border);
   box-shadow: var(--shadow-lg);
 }
@@ -2708,8 +2709,8 @@ body.light-theme pre {
 /* Glass Background Utility */
 .bg-dark-glass {
   background-color: rgba(0, 0, 0, 0.2);
-  backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
 }
 
 body.light-theme .bg-dark-glass {
@@ -2723,8 +2724,8 @@ body.light-theme .bg-dark-glass {
   border: 1px solid var(--glass-border);
   border-radius: 16px;
   box-shadow: var(--shadow-lg);
-  backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(20px);
   color: var(--text-main);
 }
 
@@ -2760,8 +2761,8 @@ body.light-theme .btn-close {
 /* Alert Styles */
 .alert-info {
   background-color: rgba(59, 130, 246, 0.15);
-  backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(20px);
   border: 1px solid var(--glass-border);
   box-shadow: var(--shadow-lg);
 }
@@ -2903,8 +2904,8 @@ body.light-theme pre {
 /* Glass Background Utility */
 .bg-dark-glass {
   background-color: rgba(0, 0, 0, 0.2);
-  backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
 }
 
 body.light-theme .bg-dark-glass {
@@ -2918,8 +2919,8 @@ body.light-theme .bg-dark-glass {
   border: 1px solid var(--glass-border);
   border-radius: 16px;
   box-shadow: var(--shadow-lg);
-  backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(20px);
   color: var(--text-main);
 }
 
@@ -2984,8 +2985,8 @@ body.light-theme .alert-info {
   border: 1px solid rgba(255, 255, 255, 0.05) !important;
   background: color-mix(in srgb, var(--bg-surface) 94%, white 6%) !important;
   box-shadow: 0 10px 24px rgba(15, 23, 42, 0.14) !important;
-  backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
 }
 
 .Vue-Toastification__toast--success,

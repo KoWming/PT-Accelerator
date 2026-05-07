@@ -36,44 +36,48 @@
         </header>
 
         <section class="logs-toolbar">
-          <label class="logs-toolbar-field logs-toolbar-field-search">
-            <span>关键词</span>
-            <div class="logs-search-input">
-              <i class="bx bx-search"></i>
-              <input v-model.trim="searchKeyword" type="text" placeholder="搜索模块名、日志级别或消息内容" />
-            </div>
-          </label>
+          <div class="logs-toolbar-mobile-row">
+            <label class="logs-toolbar-field logs-toolbar-field-search">
+              <span>关键词</span>
+              <div class="logs-search-input">
+                <i class="bx bx-search"></i>
+                <input v-model.trim="searchKeyword" type="text" placeholder="搜索模块名、日志级别或消息内容" />
+              </div>
+            </label>
 
-          <label class="logs-toolbar-field">
-            <span>级别</span>
-            <select v-model="selectedLevel">
-              <option value="all">全部级别</option>
-              <option value="ERROR">仅 ERROR</option>
-              <option value="WARNING">仅 WARNING</option>
-              <option value="INFO">仅 INFO</option>
-              <option value="DEBUG">仅 DEBUG</option>
-              <option value="RAW">仅 RAW</option>
-            </select>
-          </label>
+            <label class="logs-toolbar-field">
+              <span>级别</span>
+              <select v-model="selectedLevel">
+                <option value="all">全部级别</option>
+                <option value="ERROR">仅 ERROR</option>
+                <option value="WARNING">仅 WARNING</option>
+                <option value="INFO">仅 INFO</option>
+                <option value="DEBUG">仅 DEBUG</option>
+                <option value="RAW">仅 RAW</option>
+              </select>
+            </label>
+          </div>
 
-          <label class="logs-toolbar-field">
-            <span>读取条数</span>
-            <select v-model="lineLimit" @change="fetchLogs">
-              <option :value="200">最近 200 行</option>
-              <option :value="500">最近 500 行</option>
-              <option :value="1000">最近 1000 行</option>
-              <option :value="2000">最近 2000 行</option>
-            </select>
-          </label>
+          <div class="logs-toolbar-mobile-row logs-toolbar-mobile-row-secondary">
+            <label class="logs-toolbar-field">
+              <span>读取条数</span>
+              <select v-model="lineLimit" @change="fetchLogs">
+                <option :value="200">最近 200 行</option>
+                <option :value="500">最近 500 行</option>
+                <option :value="1000">最近 1000 行</option>
+                <option :value="2000">最近 2000 行</option>
+              </select>
+            </label>
 
-          <button
-            type="button"
-            class="logs-toolbar-reset"
-            @click="resetFilters"
-            :disabled="selectedLevel === 'all' && !searchKeyword"
-          >
-            清空筛选
-          </button>
+            <button
+              type="button"
+              class="logs-toolbar-reset"
+              @click="resetFilters"
+              :disabled="selectedLevel === 'all' && !searchKeyword"
+            >
+              清空筛选
+            </button>
+          </div>
         </section>
 
         <div class="log-viewer" ref="logContainer">
@@ -526,6 +530,10 @@ watch(() => store.logText, () => {
   margin-bottom: 1rem;
 }
 
+.logs-toolbar-mobile-row {
+  display: contents;
+}
+
 .logs-toolbar-field {
   display: grid;
   gap: 0.45rem;
@@ -902,6 +910,61 @@ watch(() => store.logText, () => {
 
   .logs-card {
     padding: 1rem;
+  }
+
+  .logs-toolbar {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: stretch;
+  }
+
+  .logs-toolbar-mobile-row {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.65rem;
+    align-items: end;
+  }
+
+  .logs-toolbar-mobile-row-secondary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .logs-toolbar-field-search {
+    min-width: 0;
+  }
+
+  .logs-toolbar-field-search .logs-search-input {
+    width: 100%;
+    min-width: 0;
+    padding-inline: 0.75rem;
+  }
+
+  .logs-toolbar-field-search .logs-search-input input {
+    width: 100%;
+    min-width: 0;
+    font-size: 0.84rem;
+  }
+
+  .logs-toolbar-mobile-row .logs-toolbar-field,
+  .logs-toolbar-mobile-row .logs-toolbar-reset {
+    min-width: 0;
+  }
+
+  .logs-toolbar-mobile-row .logs-toolbar-reset {
+    grid-column: auto;
+    width: 100%;
+    padding-inline: 0.5rem;
+    justify-self: stretch;
+  }
+
+  .logs-toolbar-mobile-row .logs-toolbar-field span {
+    white-space: nowrap;
+  }
+
+  .logs-toolbar-mobile-row .logs-toolbar-field select {
+    width: 100%;
+    min-width: 0;
+    padding-inline: 0.65rem;
+    font-size: 0.84rem;
   }
 
   .log-viewer {
