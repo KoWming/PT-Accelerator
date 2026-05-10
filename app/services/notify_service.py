@@ -165,7 +165,6 @@ def build_structured_notification(
     push_time = push_time or datetime.now()
     detail_items = detail_items or []
     lines = [
-        f"【🚀 {header}】",
         NOTIFY_SEPARATOR,
         f"📌 任务类型：{task_type}",
         f"{'✅' if success else '❌'} 执行结果：{result_text or ('任务完成' if success else '任务失败')}",
@@ -187,7 +186,7 @@ def build_structured_notification(
     if footer:
         lines.extend(["", footer])
 
-    return "", "\n".join(lines)
+    return f"【🚀 {header}】", "\n".join(lines)
 
 
 class NotifyService:

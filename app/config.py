@@ -254,7 +254,7 @@ DEFAULT_CONFIG: dict = {
 
 
     "app": {
-        "version": "3.0.1",
+        "version": "3.0.2",
         "debug": False,
     },
     "auth": {

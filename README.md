@@ -28,6 +28,8 @@
 
 ### 1. ⚡ CFST 加速管理
 
+> 基于 [CloudflareSpeedTest (XIU2)](https://github.com/XIU2/CloudflareSpeedTest) 项目
+
 - 启动时自动检测 CFST 二进制
 - 缺失时尝试自动安装
 - 支持测速任务配置与结果管理
@@ -161,7 +163,7 @@ PT-Accelerator-New/
 
 ### 使用 Docker Compose
 
-项目已提供 `docker-compose.yml`，默认映射端口为 `23333`。
+项目已提供 `docker-compose.yml`，默认使用 host 网络模式，端口由 `APP_PORT` 环境变量控制（默认 `23333`）。
 
 可参考以下编排示例：
 
@@ -173,8 +175,7 @@ services:
     image: kowming/pt-accelerator:new
     container_name: pt-accelerator-new
     restart: unless-stopped
-    ports:
-      - "23333:23333"
+    network_mode: host
     volumes:
       - /etc/hosts:/etc/hosts  #必须，用于 Hosts 联动功能
       - ./CFST:/app/CFST
@@ -182,9 +183,10 @@ services:
       - ./logs:/app/logs
       - ./cache:/app/cache
     environment:
+      - TZ=Asia/Shanghai
       - APP_PORT=23333
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:23333/api/health"]
+      test: ["CMD-SHELL", "curl -f http://localhost:$APP_PORT/api/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -221,7 +223,8 @@ docker compose up -d
 docker run -d \
 	--name pt-accelerator-new \
 	--restart unless-stopped \
-	-p 23333:23333 \
+	--network host \
+	-e TZ=Asia/Shanghai \
 	-e APP_PORT=23333 \
 	-v /etc/hosts:/etc/hosts \
 	-v ./CFST:/app/CFST \
@@ -317,17 +320,30 @@ docker build -t pt-accelerator:new .
 
 ## 🏷️ 版本信息
 
-当前项目版本：`3.0.1`
+当前项目版本：`3.0.2`
 
 ### 更新日志
 
-#### v3.0.1 (2025-05-07)
+#### v3.0.2 (2026-05-10)
 
 **🐛 Bug 修复**
-- 修复定时任务 Cron 表达式时区偏移问题
+- 修复 Server酱通知发送失败（title 为空导致 API 400 错误）
+- 修复通知标题重复显示问题（title 和 body 同时包含标题）
+- 修复 `PUT /api/trackers/ip` 接口 500 错误（缺少 `update_all_trackers_ip` 方法）
+- 修复 Cloudflare 域名名单更新后 tracker 的 `is_cloudflare` 标记未同步的问题
+
+**✨ 功能优化**
+- Cloudflare 域名名单新增「当前 IP」列显示
+- 通知渠道开关操作新增 Toast 提示反馈
+- `list_enabled_cloudflare` 运行时检查白名单，白名单域名无需网络检测直接生效
+
+**🐳 Docker 优化**
+- 添加 `TZ=Asia/Shanghai` 环境变量，修复容器日志和通知时间偏差 8 小时
+- 改用 `network_mode: host`，移除端口映射
+- 健康检查改用 `CMD-SHELL`，端口统一由 `APP_PORT` 变量控制
 
 **💄 UI 优化**
-- 优化移动端 UI 显示效果，改善小屏设备下的布局适配与交互体验
+- 移动端 Cloudflare 域名名单：IP 与域名显示在同一行
 
 ## 📄 许可证
 

@@ -5,8 +5,7 @@ services:
     image: pt-accelerator:new
     container_name: pt-accelerator-new
     restart: unless-stopped
-    ports:
-      - "23333:23333"
+    network_mode: host
     volumes:
       - /etc/hosts:/etc/hosts  #必须，用于 Hosts 联动功能
       - ./CFST:/app/CFST
@@ -14,9 +13,10 @@ services:
       - ./logs:/app/logs
       - ./cache:/app/cache
     environment:
+      - TZ=Asia/Shanghai
       - APP_PORT=23333
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:23333/api/health"]
+      test: ["CMD-SHELL", "curl -f http://localhost:$APP_PORT/api/health"]
       interval: 30s
       timeout: 10s
       retries: 3

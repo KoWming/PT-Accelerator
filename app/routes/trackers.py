@@ -49,7 +49,7 @@ TRACKER_PUBLIC_FIELDS = ("id", "name", "url", "enabled", "ip")
 def _normalize_cloudflare_domains(domains: list[str] | tuple[str, ...] | set[str]) -> list[str]:
     normalized: list[str] = []
     for domain in domains:
-        normalized_domain = cloudflare_detector._normalize_domain(str(domain or ""))
+        normalized_domain = cloudflare_detector._normalize_domain(domain or "")
         if normalized_domain and normalized_domain not in normalized:
             normalized.append(normalized_domain)
     return sorted(normalized)
@@ -130,6 +130,7 @@ async def update_cloudflare_domains(
     domains = _normalize_cloudflare_domains(req.domains)
     config.set("cloudflare_domains", domains)
     config.save()
+    tracker_service.sync_cloudflare_flags()
     logger.info(f"Cloudflare 域名名单已更新，操作用户：{session['username']}，数量：{len(domains)}")
     return ApiResponse(
         data=TrackerCloudflareDomainsOut(

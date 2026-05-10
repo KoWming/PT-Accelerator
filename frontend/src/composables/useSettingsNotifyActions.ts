@@ -101,7 +101,8 @@ export const useSettingsNotifyActions = ({
       });
       await reloadNotifySection(
         '通知渠道状态已更新',
-        `渠道“${channel.name}”的启停状态已刷新。`
+        `渠道"${channel.name}"的启停状态已刷新。`,
+        `${channel.name} 已${channel.enabled ? '关闭' : '开启'}`
       );
     } catch (e: any) {
       const message = getErrorMessage(e, '更新通知渠道状态失败');

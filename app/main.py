@@ -58,7 +58,7 @@ async def lifespan(_app: FastAPI):
 # 创建 FastAPI 实例
 app = FastAPI(
     title="PT-Accelerator",
-    version=config.get("app.version", "3.0.1"),
+    version=config.get("app.version", "3.0.2"),
     debug=config.get("app.debug", False),
     lifespan=lifespan,
 )

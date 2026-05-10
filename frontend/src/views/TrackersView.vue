@@ -251,12 +251,17 @@
                   <thead>
                     <tr>
                       <th scope="col"><span class="tracker-cloudflare-domain-cell">域名</span></th>
+                      <th scope="col">当前 IP</th>
                       <th scope="col">操作</th>
                     </tr>
                   </thead>
                   <tbody>
                     <tr v-for="domain in cloudflareDomains" :key="domain" class="tracker-cloudflare-row">
-                      <td :title="domain"><span class="tracker-cloudflare-domain-cell">{{ domain }}</span></td>
+                      <td :title="domain">
+                        <span class="tracker-cloudflare-domain-cell">{{ domain }}</span>
+                        <span class="tracker-cloudflare-ip-inline mono-text">{{ getCloudflareTrackerIp(domain) }}</span>
+                      </td>
+                      <td class="tracker-cloudflare-ip-col mono-text">{{ getCloudflareTrackerIp(domain) }}</td>
                       <td class="tracker-cloudflare-actions">
                         <button class="tracker-action-btn tracker-action-danger tracker-cloudflare-delete-btn" @click="handleDeleteCloudflareDomain(domain)">
                           <span>
@@ -714,6 +719,13 @@ const handleDeleteCloudflareDomain = async (domain: string) => {
     const detail = getErrorMessage(e);
     toast.error(`删除 Cloudflare 域名失败: ${detail}`);
   }
+};
+
+const getCloudflareTrackerIp = (domain: string): string => {
+  const normalizedDomain = normalizeDomain(domain);
+  if (!normalizedDomain) return '—';
+  const tracker = store.trackers.find(t => normalizeDomain(t.url) === normalizedDomain);
+  return tracker?.ip || '未设置';
 };
 </script>
 
@@ -1414,6 +1426,10 @@ const handleDeleteCloudflareDomain = async (domain: string) => {
   min-width: 6.2rem;
 }
 
+.tracker-cloudflare-ip-inline {
+  display: none;
+}
+
 @media (max-width: 640px) {
   .tracker-cloudflare-table,
   .tracker-cloudflare-table thead,
@@ -1426,6 +1442,17 @@ const handleDeleteCloudflareDomain = async (domain: string) => {
 
   .tracker-cloudflare-table thead {
     display: none;
+  }
+
+  .tracker-cloudflare-ip-col {
+    display: none !important;
+  }
+
+  .tracker-cloudflare-ip-inline {
+    display: inline;
+    margin-left: 0.5rem;
+    color: var(--text-muted, #8e9bae);
+    font-size: 0.85em;
   }
 
   .tracker-cloudflare-table tbody tr {
@@ -1460,9 +1487,7 @@ const handleDeleteCloudflareDomain = async (domain: string) => {
   }
 
   .tracker-cloudflare-domain-cell {
-    display: flex;
-    justify-content: flex-start;
-    width: 100%;
+    display: inline;
     max-width: none;
     text-align: left;
     overflow-wrap: anywhere;

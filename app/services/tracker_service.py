@@ -133,10 +133,14 @@ class TrackerService:
         return self._get_items().copy()
 
     def list_enabled_cloudflare(self) -> list[dict]:
-        """列出所有已启用且判定为 Cloudflare 的 tracker"""
+        """列出所有已启用且判定为 Cloudflare 的 tracker（同时检查白名单）"""
+        whitelist = cloudflare_detector._get_whitelist()
         return [
             t for t in self._get_items()
-            if t.get("enabled", True) and t.get("is_cloudflare", False)
+            if t.get("enabled", True) and (
+                t.get("is_cloudflare", False)
+                or _extract_host(t.get("url", "")) in whitelist
+            )
         ]
 
     def get_tracker(self, tracker_id: str) -> Optional[dict]:
@@ -255,6 +259,44 @@ class TrackerService:
         self._save_items([])
         logger.info(f"Tracker 已全部清空：数量={cleared_count}")
         return cleared_count
+
+    def sync_cloudflare_flags(self) -> int:
+        """根据当前 Cloudflare 域名白名单同步 tracker 的 is_cloudflare 字段（无网络检测）。"""
+        whitelist = cloudflare_detector._get_whitelist()
+        items = self._get_items()
+        if not items:
+            return 0
+
+        changed = 0
+        for item in items:
+            host = _extract_host(item.get("url", ""))
+            if host in whitelist and not item.get("is_cloudflare", False):
+                item["is_cloudflare"] = True
+                changed += 1
+
+        if changed:
+            self._save_items(items)
+            logger.info(f"Tracker Cloudflare 标记已同步：{changed} 条更新")
+        return changed
+
+    def update_all_trackers_ip(self, ip: str) -> int:
+        """批量更新全部 tracker 的当前 IP。"""
+        ip = (ip or "").strip()
+        if not ip:
+            raise ValueError("IP 地址不能为空")
+        if not re_module.match(r"^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$", ip):
+            raise ValueError(f"无效的 IPv4 地址: {ip}")
+
+        items = self._get_items()
+        if not items:
+            return 0
+
+        for item in items:
+            item["ip"] = ip
+
+        self._save_items(items)
+        logger.info(f"Tracker 当前 IP 已全部更新：数量={len(items)}，IP={ip}")
+        return len(items)
 
     def update_trackers_ip_by_urls(self, urls: list[str], ip: str) -> int:
         """按指定 tracker URL 集合批量更新当前 IP。"""
