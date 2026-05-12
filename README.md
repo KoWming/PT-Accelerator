@@ -320,9 +320,21 @@ docker build -t pt-accelerator:new .
 
 ## 🏷️ 版本信息
 
-当前项目版本：`3.0.3`
+当前项目版本：`3.0.4`
 
 ### 更新日志
+
+#### v3.0.4 (2026-05-12)
+
+**✨ 功能优化**
+- 适配qbittorrent 5.0.0 及以上版本的 API 变更，更新下载器连接逻辑
+- 下载器连接层统一适配新版 `qbittorrent-api` 与 `transmission-rpc` 依赖
+- `qBittorrent` 新增 API Key 认证支持，兼容新版 WebUI 鉴权方式
+- 清理 Transmission 旧版兼容逻辑，仅保留基于最新依赖的实现
+- 优化 `start.bat` 与 `start.sh` 启动脚本，统一为 `python main.py` 入口并增强启动日志展示
+
+<details>
+<summary>查看历史更新日志</summary>
 
 #### v3.0.3 (2026-05-12)
 
@@ -336,9 +348,6 @@ docker build -t pt-accelerator:new .
 - Cloudflare 域名名单中的域名即使不是 Tracker，也可在 CFST 优选后写入系统 Hosts
 - 优化 `IP优选与Hosts更新` 通知样式，补充 Hosts 源统计、探测成功数、失败兜底数与失败兜底域名展示
 - 优化 `CFST测速` 单独通知语义，在跳过 Hosts 更新或执行失败时展示更明确的状态与原因
-
-<details>
-<summary>查看历史更新日志</summary>
 
 #### v3.0.2 (2026-05-10)
 

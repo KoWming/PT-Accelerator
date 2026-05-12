@@ -1,22 +1,25 @@
-# PT-Accelerator Dependencies
+# PT-Accelerator Python 运行依赖
 
-# Web Framework
+# Web 框架与服务启动
 fastapi>=0.110.0
 uvicorn[standard]>=0.27.0
-python-multipart>=0.0.9  # fastapi.static_files
+python-multipart>=0.0.9
 
-# Async HTTP
+# 网络请求与 DNS 解析
 httpx>=0.27.0
 dnspython>=2.6.1
 
-# Configuration
+# 下载器客户端 SDK
+qbittorrent-api>=2026.5.1
+transmission-rpc>=4.3.0
 
+# 配置文件与数据校验
 pyyaml>=6.0.1
 pydantic>=2.6.0
 
-# Scheduler
+# 定时任务调度
 apscheduler>=3.10.4
 
-# Frontend Build (optional, for local development)
+# 前端本地构建环境（提示用，非 pip 依赖）
 # node>=18.0.0
 # npm>=9.0.0

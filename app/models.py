@@ -297,6 +297,7 @@ class DownloaderIn(BaseModel):
     port: int = Field(ge=1, le=65535)
     username: str = ""
     password: str = ""
+    apikey: str = ""
     enabled: bool = True
     version: Optional[str] = None  # 可选，用于保存下载器版本
 
@@ -333,6 +334,7 @@ class DownloaderTestIn(BaseModel):
     port: int
     username: str
     password: str
+    apikey: str = ""
 
 
 # ==================== Backup ====================

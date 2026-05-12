@@ -28,7 +28,7 @@ CLIENT_TYPE_OPTIONS = [
         "type": "qbittorrent",
         "name": "qBittorrent",
         "default_port": DEFAULT_PORTS["qbittorrent"],
-        "fields": ["host", "port", "username", "password"],
+        "fields": ["host", "port", "username", "password", "apikey"],
     },
     {
         "type": "transmission",
@@ -126,6 +126,7 @@ def _build_client_item(
     port: int,
     username: str = "",
     password: str = "",
+    apikey: str = "",
     version: Optional[str] = None,
 ) -> dict:
     """统一构造下载器配置项，固定字段顺序。"""
@@ -139,6 +140,8 @@ def _build_client_item(
         "username": username,
         "password": password,
     }
+    if apikey:
+        item["apikey"] = apikey
     if version:
         item["version"] = version
     return item
@@ -224,6 +227,7 @@ class ClientsService:
         port: int,
         username: str = "",
         password: str = "",
+        apikey: str = "",
         enabled: bool = True,
         version: Optional[str] = None,
     ) -> dict:
@@ -246,6 +250,7 @@ class ClientsService:
                 port=port_for_save,
                 username=username,
                 password=password,
+                apikey=apikey or item.get("apikey", ""),
                 version=version or item.get("version"),
             )
             items[idx] = updated_item
@@ -263,6 +268,7 @@ class ClientsService:
             port=port_for_save,
             username=username,
             password=password,
+            apikey=apikey,
             version=version,
         )
 
@@ -281,6 +287,7 @@ class ClientsService:
         port: Optional[int] = None,
         username: Optional[str] = None,
         password: Optional[str] = None,
+        apikey: Optional[str] = None,
         enabled: Optional[bool] = None,
         version: Optional[str] = None,
     ) -> Optional[dict]:
@@ -303,6 +310,7 @@ class ClientsService:
 
         next_username = username if username is not None else item.get("username", "")
         next_password = password if password is not None else item.get("password", "")
+        next_apikey = apikey if apikey is not None else item.get("apikey", "")
         next_enabled = enabled if enabled is not None else item.get("enabled", True)
         next_version = version if version is not None else item.get("version")
 
@@ -315,6 +323,7 @@ class ClientsService:
             port=next_port,
             username=str(next_username),
             password=str(next_password),
+            apikey=str(next_apikey),
             version=str(next_version) if next_version else None,
         )
 
@@ -355,6 +364,7 @@ class ClientsService:
                 port=item["port"],
                 username=item.get("username", ""),
                 password=item.get("password", ""),
+                apikey=item.get("apikey", ""),
             )
             connected = client.ping()
             if connected:
@@ -369,6 +379,7 @@ class ClientsService:
                     port=item["port"],
                     username=item.get("username", ""),
                     password=item.get("password", ""),
+                    apikey=item.get("apikey", ""),
                     version=version,
                 )
                 self._save_items(items)
@@ -386,6 +397,7 @@ class ClientsService:
         port: int,
         username: str = "",
         password: str = "",
+        apikey: str = "",
     ) -> dict:
         """使用提供的配置测试连接（不保存）。"""
         from app.services.torrent_service import create_client
@@ -397,6 +409,7 @@ class ClientsService:
                 port=port,
                 username=username,
                 password=password,
+                apikey=apikey,
             )
             connected = client.ping()
             if connected:

@@ -355,14 +355,13 @@
                       <input type="password" class="form-control" v-model="form.password" placeholder="可选">
                     </div>
                   </div>
-                  <div class="col-md-6" v-if="form.type === 'transmission'">
-                    <label class="form-label client-form-label">RPC 路径</label>
+                  <div class="col-12" v-if="form.type === 'qbittorrent'">
+                    <label class="form-label client-form-label">API Key</label>
                     <div class="input-group client-input-group">
-                      <span class="input-group-text"><i class="bx bx-folder-open"></i></span>
-                      <input type="text" class="form-control" v-model="form.path" placeholder="/transmission/rpc">
+                      <span class="input-group-text"><i class="bx bx-shield-quarter"></i></span>
+                      <input type="password" class="form-control" v-model="form.apikey" placeholder="qBittorrent 5.2+ 可选，优先于用户名密码">
                     </div>
                   </div>
-                  <div class="col-md-6"></div>
                 </div>
               </section>
             </form>
@@ -409,6 +408,7 @@ const showModal = ref(false);
 const isEdit = ref(false);
 const importing = ref(false);
 const originalPassword = ref('');
+const originalApiKey = ref('');
 const testing = ref<string | null>(null);
 const testingConfig = ref(false);
 const saving = ref(false);
@@ -439,9 +439,9 @@ const form = reactive<TorrentClient>({
   port: 8080,
   username: '',
   password: '',
+  apikey: '',
   enabled: true,
   enable: true,
-  path: '/transmission/rpc',
 });
 
 // host 字段直接包含完整地址，格式如：https://qbittorrent.example.com:8099
@@ -613,9 +613,9 @@ const openAddModal = () => {
     port: 8080,
     username: '',
     password: '',
+    apikey: '',
     enabled: true,
     enable: true,
-    path: '/transmission/rpc',
   });
   syncHostInputValue();
   showModal.value = true;
@@ -627,8 +627,11 @@ const openEditModal = (client: TorrentClient) => {
   Object.assign(form, client);
   // 密码掩码显示，真实密码保留用于后续操作
   const hasPassword = Boolean((client as any).password);
+  const hasApiKey = Boolean((client as any).apikey);
   originalPassword.value = (client as any).password || '';
-  form.password = hasPassword ? '********' : '';
+  originalApiKey.value = (client as any).apikey || '';
+  form.password = hasPassword ? '*'.repeat(originalPassword.value.length) : '';
+  form.apikey = hasApiKey ? '*'.repeat(originalApiKey.value.length) : '';
   normalizeHostInput(form.host || '');
   syncHostInputValue();
   showModal.value = true;
@@ -662,16 +665,19 @@ const handleSaveClient = async () => {
       port: form.port,
       username: form.username,
       password: form.password,
+      apikey: form.apikey,
       enabled: form.enabled,
       enable: form.enable,
       version: form.version,
-      path: form.path,
     };
     // 保存前先测试连接并带上版本号，一次保存完成
     // 测试时使用真实密码（如果用户未修改密码，则用原始密码）
     const testPayload: Downloader = { ...payload };
-    if (testPayload.password === '********') {
+    if (originalPassword.value && testPayload.password === '*'.repeat(originalPassword.value.length)) {
       testPayload.password = originalPassword.value;
+    }
+    if (originalApiKey.value && testPayload.apikey === '*'.repeat(originalApiKey.value.length)) {
+      testPayload.apikey = originalApiKey.value;
     }
     try {
       const testRes = await store.testConnectionConfig(testPayload);
@@ -683,8 +689,11 @@ const handleSaveClient = async () => {
     }
 
     // 保存时只发送实际新密码，避免用 ******** 覆盖已有密码
-    if (payload.password === '********' || payload.password === '') {
+    if ((originalPassword.value && payload.password === '*'.repeat(originalPassword.value.length)) || payload.password === '') {
       delete payload.password;
+    }
+    if ((originalApiKey.value && payload.apikey === '*'.repeat(originalApiKey.value.length)) || payload.apikey === '') {
+      delete payload.apikey;
     }
 
     if (isEdit.value) {
@@ -695,6 +704,7 @@ const handleSaveClient = async () => {
 
     showModal.value = false;
     originalPassword.value = '';
+    originalApiKey.value = '';
     toast.success('保存成功');
   } catch (e) {
     toast.error('保存失败');
@@ -741,8 +751,11 @@ const testConfig = async () => {
   try {
     // 测试时使用真实密码（如果用户未修改密码，则用原始密码）
     const testPayload = { ...form };
-    if (testPayload.password === '********') {
+    if (originalPassword.value && testPayload.password === '*'.repeat(originalPassword.value.length)) {
       testPayload.password = originalPassword.value;
+    }
+    if (originalApiKey.value && testPayload.apikey === '*'.repeat(originalApiKey.value.length)) {
+      testPayload.apikey = originalApiKey.value;
     }
     const res = await store.testConnectionConfig(testPayload);
     if (res.success) {

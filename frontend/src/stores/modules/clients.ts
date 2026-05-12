@@ -10,10 +10,10 @@ export interface Downloader {
     port: number;
     username?: string;
     password?: string;
+    apikey?: string;
     enabled?: boolean;
     enable?: boolean;
     version?: string;
-    path?: string;
 }
 
 export type TorrentClient = Downloader;
@@ -51,6 +51,7 @@ export const useClientStore = defineStore('clients', {
                         port: d.port,
                         username: d.username,
                         password: d.password,
+                        apikey: d.apikey,
                         enabled: d.enabled,
                         version: d.version,
                         // 兼容旧属性
@@ -96,6 +97,7 @@ export const useClientStore = defineStore('clients', {
                 port: data.port,
                 username: data.username,
                 password: data.password,
+                apikey: data.apikey,
                 enabled: isEnabled,
                 version: data.version,
             });
@@ -114,6 +116,7 @@ export const useClientStore = defineStore('clients', {
                 port: data.port,
                 username: data.username,
                 password: data.password,
+                apikey: data.apikey,
                 enabled: isEnabled,
                 version: data.version,
             });
@@ -151,6 +154,7 @@ export const useClientStore = defineStore('clients', {
                 port: config.port,
                 username: config.username,
                 password: config.password,
+                apikey: config.apikey,
             });
             return result.data;
         },

@@ -2,7 +2,7 @@ version: "3.8"
 
 services:
   pt-accelerator:
-    image: pt-accelerator:new
+    image: kowming/pt-accelerator:new
     container_name: pt-accelerator-new
     restart: unless-stopped
     network_mode: host

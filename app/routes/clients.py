@@ -105,6 +105,7 @@ async def add_client(
             port=req.port,
             username=req.username or "",
             password=req.password or "",
+            apikey=req.apikey or "",
             enabled=req.enabled,
             version=req.version,
         )
@@ -171,6 +172,7 @@ async def update_client(
             port=req.port,
             username=req.username or "",
             password=req.password or "",
+            apikey=req.apikey or "",
             enabled=req.enabled,
             version=req.version,
         )
@@ -245,5 +247,6 @@ async def test_client_by_config(
         port=req.port,
         username=req.username or "",
         password=req.password or "",
+        apikey=req.apikey or "",
     )
     return ApiResponse(data=result).model_dump()

@@ -1,23 +1,21 @@
 """
 下载器连接池（qBittorrent / Transmission）
 """
-import base64
 import re
-from urllib.parse import urlparse
-import httpx
 from typing import Optional
+import qbittorrentapi
+import transmission_rpc
 
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
 
-
 def _parse_host(host: str) -> tuple[str, str, int]:
     """
     解析 host 字段，提取协议、主机名和端口。
     host 格式支持：
-    - https://qbittorrent.example.com:8443
+    - https://qbittorrent.example.com:8080
     - http://qbittorrent.example.com
     - qbittorrent.example.com (默认 http:8080)
 
@@ -51,7 +49,7 @@ def _parse_host(host: str) -> tuple[str, str, int]:
 class TorrentClientBase:
     """下载器基类"""
 
-    def __init__(self, host: str, port: int, username: str, password: str):
+    def __init__(self, host: str, port: int, username: str, password: str, apikey: str = ""):
         # 从 host 直接解析协议和完整 URL
         self._protocol, clean_host, parsed_port = _parse_host(host)
         # 如果 host 包含协议前缀，先去掉协议前缀再检查是否包含端口
@@ -65,9 +63,12 @@ class TorrentClientBase:
         # 只有当去掉协议后仍然包含端口（:digits）时才使用解析出的端口
         has_port = bool(re.search(r':\d+$', host_without_proto))
         final_port = parsed_port if has_port else port
+        self._host = clean_host
+        self._port = final_port
         self._base_url = f"{self._protocol}://{clean_host}:{final_port}"
         self._username = username
         self._password = password
+        self._apikey = (apikey or "").strip()
         self._use_ssl = self._protocol == "https"
         self._connected = False
         self._version: Optional[str] = None
@@ -89,29 +90,55 @@ class TorrentClientBase:
         return self._connected
 
 
-
 class QbittorrentClient(TorrentClientBase):
     """qBittorrent 客户端"""
 
-    def __init__(self, host: str, port: int, username: str, password: str):
-        super().__init__(host, port, username, password)
-        self._sid: Optional[str] = None
+    def __init__(self, host: str, port: int, username: str, password: str, apikey: str = ""):
+        super().__init__(host, port, username, password, apikey)
+        self._client: Optional[qbittorrentapi.Client] = None
+
+    def _build_client(self) -> qbittorrentapi.Client:
+        kwargs = {
+            "host": self._base_url,
+            "username": self._username,
+            "password": self._password,
+            "VERIFY_WEBUI_CERTIFICATE": False,
+            "REQUESTS_ARGS": {"timeout": (10, 30)},
+        }
+        if self._apikey:
+            kwargs["EXTRA_HEADERS"] = {"Authorization": f"Bearer {self._apikey}"}
+        return qbittorrentapi.Client(**kwargs)
 
     def _login(self):
-        """登录获取 Session ID"""
-        with httpx.Client(base_url=self._base_url, timeout=10, verify=False) as client:
-            resp = client.post("/api/v2/auth/login", data={
-                "username": self._username,
-                "password": self._password,
-            })
-            if resp.status_code == 200:
-                self._sid = resp.cookies.get("SID")
-                self._connected = bool(self._sid)
-                if not self._connected:
-                    logger.warning("qBittorrent 登录成功但未获取到会话标识")
+        """登录并初始化 qBittorrent API 客户端。"""
+        try:
+            client = self._build_client()
+            if self._apikey:
+                version = client.app_version()
             else:
-                self._connected = False
-                logger.warning(f"qBittorrent 登录失败，状态码：{resp.status_code}")
+                client.auth_log_in()
+                version = client.app_version()
+
+            self._client = client
+            self._version = str(version).strip() or None
+            self._connected = True
+        except qbittorrentapi.LoginFailed as e:
+            self._client = None
+            self._connected = False
+            logger.warning(f"qBittorrent 登录失败（{self._base_url}）：{e}")
+        except qbittorrentapi.APIConnectionError as e:
+            self._client = None
+            self._connected = False
+            logger.error(f"qBittorrent 连接失败（{self._base_url}）：{e}")
+        except Exception as e:
+            self._client = None
+            self._connected = False
+            logger.error(f"qBittorrent 初始化失败（{self._base_url}）：{e}")
+
+    def _ensure_client(self) -> Optional[qbittorrentapi.Client]:
+        if not self._client or not self._connected:
+            self._login()
+        return self._client if self._connected else None
 
     def ping(self) -> bool:
         try:
@@ -125,52 +152,42 @@ class QbittorrentClient(TorrentClientBase):
 
     def get_version(self) -> Optional[str]:
         """获取 qBittorrent 版本"""
-        if not self._sid:
-            self._login()
-        if not self._sid:
+        client = self._ensure_client()
+        if not client:
             return None
         try:
-            with httpx.Client(base_url=self._base_url, timeout=10, verify=False, cookies={"SID": self._sid}) as client:
-                resp = client.get("/api/v2/app/version")
-                if resp.status_code == 200:
-                    self._version = resp.text.strip()
-                    return self._version
-                return None
+            version = client.app_version()
+            self._version = str(version).strip() or None
+            return self._version
         except Exception as e:
             logger.warning(f"获取 qBittorrent 版本失败：{e}")
             return None
 
     def get_trackers(self) -> list[str]:
         """获取 qBittorrent 中所有种子的 Tracker URL 列表"""
-        if not self._sid:
-            self._login()
-        if not self._sid:
+        client = self._ensure_client()
+        if not client:
             return []
 
         tracker_urls: set[str] = set()
 
         try:
-            with httpx.Client(base_url=self._base_url, timeout=15, verify=False, cookies={"SID": self._sid}) as client:
-                torrents_resp = client.get("/api/v2/torrents/info")
-                if torrents_resp.status_code != 200:
-                    logger.warning(f"获取 qBittorrent 种子列表失败，状态码：{torrents_resp.status_code}")
-                    return []
+            torrents = client.torrents_info()
+            for torrent in torrents:
+                torrent_hash = getattr(torrent, "hash", None)
+                if not torrent_hash:
+                    continue
 
-                torrents = torrents_resp.json()
-                for torrent in torrents:
-                    torrent_hash = torrent.get("hash")
-                    if not torrent_hash:
-                        continue
+                try:
+                    trackers = client.torrents_trackers(torrent_hash=torrent_hash)
+                except Exception as e:
+                    logger.debug(f"获取 qBittorrent 种子 {torrent_hash} 的 Tracker 失败：{e}")
+                    continue
 
-                    trackers_resp = client.get("/api/v2/torrents/trackers", params={"hash": torrent_hash})
-                    if trackers_resp.status_code != 200:
-                        logger.debug(f"获取 qBittorrent 种子 {torrent_hash} 的 Tracker 失败，状态码：{trackers_resp.status_code}")
-                        continue
-
-                    for tracker in trackers_resp.json():
-                        tracker_url = (tracker.get("url") or "").strip()
-                        if tracker_url and "://" in tracker_url:
-                            tracker_urls.add(tracker_url)
+                for tracker in trackers:
+                    tracker_url = str(getattr(tracker, "url", "") or "").strip()
+                    if tracker_url and "://" in tracker_url:
+                        tracker_urls.add(tracker_url)
         except Exception as e:
             logger.warning(f"获取 qBittorrent Tracker 列表失败：{e}")
             return []
@@ -178,48 +195,41 @@ class QbittorrentClient(TorrentClientBase):
         return list(tracker_urls)
 
 
-
 class TransmissionClient(TorrentClientBase):
     """Transmission 客户端"""
 
-    def __init__(self, host: str, port: int, username: str, password: str):
-        super().__init__(host, port, username, password)
-        self._session_id: Optional[str] = None
+    def __init__(self, host: str, port: int, username: str, password: str, apikey: str = ""):
+        super().__init__(host, port, username, password, apikey)
+        self._client: Optional[transmission_rpc.Client] = None
 
-    def _get_headers(self) -> dict:
-        """获取认证 headers"""
-        headers = {}
-        if self._username:
-            credentials = base64.b64encode(
-                f"{self._username}:{self._password}".encode()
-            ).decode()
-            headers["Authorization"] = f"Basic {credentials}"
-        if self._session_id:
-            headers["X-Transmission-Session-Id"] = self._session_id
-        return headers
-
-    def _rpc(self, payload: dict) -> Optional[dict]:
+    def _login(self):
         try:
-            with httpx.Client(base_url=self._base_url, timeout=15, verify=False, headers=self._get_headers()) as client:
-                resp = client.post("/transmission/rpc", json=payload)
-                if resp.status_code == 409:
-                    self._session_id = resp.headers.get("X-Transmission-Session-Id")
-                    resp = client.post(
-                        "/transmission/rpc",
-                        json=payload,
-                        headers=self._get_headers(),
-                    )
-                if resp.status_code != 200:
-                    return None
-                return resp.json()
+            self._client = transmission_rpc.Client(
+                protocol=self._protocol,
+                host=self._host,
+                port=self._port,
+                username=self._username or None,
+                password=self._password or None,
+                timeout=30,
+            )
+            self._connected = True
         except Exception as e:
-            logger.warning(f"Transmission RPC 请求失败：{e}")
-            return None
+            self._client = None
+            self._connected = False
+            logger.error(f"Transmission 连接失败（{self._base_url}）：{e}")
+
+    def _ensure_client(self) -> Optional[transmission_rpc.Client]:
+        if not self._client or not self._connected:
+            self._login()
+        return self._client if self._connected else None
 
     def ping(self) -> bool:
         try:
-            data = self._rpc({"method": "session-stats"})
-            self._connected = bool(data)
+            client = self._ensure_client()
+            if not client:
+                return False
+            client.session_stats()
+            self._connected = True
             return self._connected
         except Exception as e:
             logger.error(f"Transmission 连接失败（{self._base_url}）：{e}")
@@ -227,13 +237,13 @@ class TransmissionClient(TorrentClientBase):
 
     def get_version(self) -> Optional[str]:
         """获取 Transmission 版本"""
-        data = self._rpc({"method": "session-get"})
-        if not data:
+        client = self._ensure_client()
+        if not client:
             return None
         try:
-            version = data.get("arguments", {}).get("version")
+            version = getattr(client, "server_version", None)
             if version:
-                self._version = version
+                self._version = str(version)
                 return self._version
             return None
         except Exception as e:
@@ -242,20 +252,23 @@ class TransmissionClient(TorrentClientBase):
 
     def get_trackers(self) -> list[str]:
         """获取 Transmission 中所有种子的 Tracker URL 列表"""
-        data = self._rpc({"method": "torrent-get", "arguments": {"fields": ["trackers"]}})
-        if not data or data.get("result") != "success":
+        client = self._ensure_client()
+        if not client:
             return []
 
         tracker_urls: set[str] = set()
-        torrents = data.get("arguments", {}).get("torrents", [])
-        for torrent in torrents:
-            for tracker in torrent.get("trackers", []):
-                tracker_url = (tracker.get("announce") or "").strip()
-                if tracker_url and "://" in tracker_url:
-                    tracker_urls.add(tracker_url)
+        try:
+            torrents = client.get_torrents(arguments=["trackers"])
+            for torrent in torrents:
+                for tracker in getattr(torrent, "trackers", []) or []:
+                    tracker_url = str(getattr(tracker, "announce", "") or "").strip()
+                    if tracker_url and "://" in tracker_url:
+                        tracker_urls.add(tracker_url)
+        except Exception as e:
+            logger.warning(f"获取 Transmission Tracker 列表失败：{e}")
+            return []
 
         return list(tracker_urls)
-
 
 
 def create_client(client_type: str, **kwargs) -> TorrentClientBase:

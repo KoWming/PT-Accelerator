@@ -15,6 +15,7 @@ export interface Downloader {
     host: string;
     port: number;
     username?: string;
+    apikey?: string;
     enabled: boolean;
     version?: string;
 }
@@ -26,6 +27,7 @@ export interface DownloaderIn {
     port: number;
     username?: string;
     password?: string;
+    apikey?: string;
     enabled?: boolean;
     version?: string;
 }
@@ -36,6 +38,7 @@ export interface DownloaderTestIn {
     port: number;
     username?: string;
     password?: string;
+    apikey?: string;
 }
 
 export interface ImportTrackersResult {

@@ -70,6 +70,7 @@ def _build_downloader_item(
     port: int,
     username: str = "",
     password: str = "",
+    apikey: str = "",
     version: str = "",
 ) -> dict:
     """统一构造下载器配置项，固定字段顺序。"""
@@ -83,6 +84,8 @@ def _build_downloader_item(
         "username": username,
         "password": password,
     }
+    if apikey:
+        item["apikey"] = apikey
     if version:
         item["version"] = version
     return item
@@ -132,6 +135,7 @@ def _normalize_downloader_item(item: dict) -> dict:
         port=port,
         username=str(item.get("username") or ""),
         password=str(item.get("password") or ""),
+        apikey=str(item.get("apikey") or ""),
         version=str(item.get("version") or ""),
     )
 
