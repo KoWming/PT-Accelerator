@@ -17,8 +17,10 @@ from threading import Lock
 
 from app.utils.logger import get_logger
 from app.utils.file_lock import file_lock
+from version import get_version
 
 logger = get_logger(__name__)
+APP_VERSION = get_version()
 
 # ==================== 路径配置 ====================
 CONFIG_DIR = os.environ.get("CONFIG_DIR", "config")
@@ -254,7 +256,7 @@ DEFAULT_CONFIG: dict = {
 
 
     "app": {
-        "version": "3.0.2",
+        "version": APP_VERSION,
         "debug": False,
     },
     "auth": {
@@ -265,7 +267,6 @@ DEFAULT_CONFIG: dict = {
         "threads": 200,
         "ping_times": 4,
         "download_count": 20,
-
         "download_time": 10,
         "timeout_seconds": 300,
         "tcp_port": 443,
@@ -290,8 +291,6 @@ DEFAULT_CONFIG: dict = {
         "backup_enabled": True,
         "target_path": _default_hosts_target_path(),
     },
-
-    "cloudflare_domains": [],
 
     "downloaders": {
         "items": DEFAULT_DOWNLOADER_ITEMS,
@@ -514,6 +513,11 @@ class Config:
         """初始化配置（在 main.py 中调用一次）"""
         logger.info("正在初始化配置...")
         self._data = self._manager.load()
+        current_version = str(self._data.get("app", {}).get("version") or "").strip()
+        if current_version != APP_VERSION:
+            self.set("app.version", APP_VERSION)
+            self.save()
+            logger.info(f"配置中的应用版本已同步：{current_version or '未设置'} -> {APP_VERSION}")
         logger.info(f"配置初始化完成，schema v{self._data.get('schema_version')}")
 
     def get(self, key: str, default: Any = None) -> Any:
@@ -549,6 +553,17 @@ class Config:
                 target[k] = {}
             target = target[k]
         target[keys[-1]] = value
+
+    def delete(self, key: str):
+        """删除配置值，支持点号路径；路径不存在时静默跳过。"""
+        keys = key.split(".")
+        target = self._data
+        for k in keys[:-1]:
+            if not isinstance(target, dict) or k not in target:
+                return
+            target = target[k]
+        if isinstance(target, dict):
+            target.pop(keys[-1], None)
 
     def get_all(self) -> dict:
         """获取完整配置副本"""

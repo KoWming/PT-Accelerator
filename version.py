@@ -4,7 +4,7 @@
 
 
 def get_version() -> str:
-    return "3.0.2"
+    return "3.0.3"
 
 
 __version__ = get_version()

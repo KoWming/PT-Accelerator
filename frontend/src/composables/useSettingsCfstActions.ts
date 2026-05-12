@@ -92,7 +92,7 @@ export const useSettingsCfstActions = ({
         download_time: getCfstNumberValue(cfstForm.download_time, cfstDefaults.download_time),
         timeout_seconds: Math.max(getCfstNumberValue(cfstForm.timeout_seconds, cfstDefaults.timeout_seconds), 30),
         tcp_port: getCfstNumberValue(cfstForm.tcp_port, cfstDefaults.tcp_port),
-        url: getCfstStringValue(cfstForm.url, cfstDefaults.url),
+        url: getCfstStringValue(cfstForm.url, ''),
         httping: Boolean(cfstForm.httping),
         httping_code: cfstForm.httping_code || '',
         cfcolo: cfstForm.cfcolo || '',

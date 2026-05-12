@@ -77,6 +77,7 @@ class HostsPipeline:
             "candidate_ip_count": 0,
             "latency_probe_success_count": 0,
             "latency_probe_fallback_count": 0,
+            "latency_probe_fallback_domains": [],
             "history_fallback_count": 0,
             "cf_count": 0,
             "ikuai_synced": False,
@@ -133,6 +134,10 @@ class HostsPipeline:
                 1 for detail in selection_details.values()
                 if detail.get("strategy") == "fallback_first_candidate"
             )
+            result["latency_probe_fallback_domains"] = sorted([
+                domain for domain, detail in selection_details.items()
+                if detail.get("strategy") == "fallback_first_candidate"
+            ])
 
             # Step 4: 用当前 Managed Hosts / 最近成功历史补回本轮缺失域名
             managed_mapping, history_fallback_details = self._hosts.apply_history_fallback(
@@ -181,21 +186,35 @@ class HostsPipeline:
             success = bool(result.get("success", False)) and not result.get("errors")
 
             if notify_context:
-                title, message = build_structured_notification(
-                    header="IP优选与Hosts更新",
-                    task_type="IP优选与Hosts更新",
-                    success=success,
-                    detail_title="优选结果",
-                    detail_items=[
-                        ("旧 IP", notify_context.get("old_ip") or "未知"),
-                        ("新 IP", notify_context.get("new_ip") or "未知"),
-                        ("测速耗时", f"{float(notify_context.get('duration_seconds', 0.0)):.2f} 秒"),
-                        ("Tracker 更新数", notify_context.get("tracker_update_count", 0)),
-                        ("Hosts 记录数", total_hosts_count),
-                    ],
-                    result_text="任务完成" if success else "任务失败",
-                    push_time=datetime.now(),
-                )
+                fallback_domains = result.get("latency_probe_fallback_domains", [])
+                push_time = datetime.now()
+                fallback_domain_lines = ["• 失败兜底域名："]
+                if fallback_domains:
+                    fallback_domain_lines.extend([f"      - {domain}" for domain in fallback_domains])
+                else:
+                    fallback_domain_lines = ["• 失败兜底域名：0"]
+
+                lines = [
+                    "──────────",
+                    "📌 任务类型：IP优选与Hosts更新",
+                    f"{'✅' if success else '❌'} 执行结果：{'任务完成' if success else '任务失败'}",
+                    "──────────",
+                    "🎯 优选结果：",
+                    f"• 旧 IP：{notify_context.get('old_ip') or '未知'}",
+                    f"• 新 IP：{notify_context.get('new_ip') or '未知'}",
+                    f"• 测速耗时：{float(notify_context.get('duration_seconds', 0.0)):.2f} 秒",
+                    f"• Tracker 更新数：{notify_context.get('tracker_update_count', 0)}",
+                    f"• Hosts 记录数：{total_hosts_count}",
+                    "──────────",
+                    "📋 Hosts源统计：",
+                    f"• 探测成功数：{result.get('latency_probe_success_count', 0)}",
+                    f"• 失败兜底数：{result.get('latency_probe_fallback_count', 0)}",
+                    *fallback_domain_lines,
+                    "──────────",
+                    f"⏰ 推送时间：{push_time.strftime('%Y-%m-%d %H:%M:%S')}",
+                ]
+                title = "【🚀 IP优选与Hosts更新】"
+                message = "\n".join(lines)
             else:
                 title, message = build_structured_notification(
                     header="Hosts更新",

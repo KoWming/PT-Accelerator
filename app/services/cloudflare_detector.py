@@ -252,9 +252,9 @@ class CloudflareDetector:
 
     @staticmethod
     def _get_whitelist() -> set[str]:
-        configured = config.get("cloudflare_domains", default=[])
-        if isinstance(configured, str):
-            configured = [configured]
+        from app.services.tracker_store import tracker_store
+
+        configured = tracker_store.load_cloudflare_domains()
         normalized_items = {
             CloudflareDetector._normalize_domain(item)
             for item in configured

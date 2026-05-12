@@ -101,7 +101,6 @@ class CfstConfigOut(BaseModel):
     binary_path: Optional[str] = None
 
 
-
 class CfstResultOut(BaseModel):
     """测速结果（单条）"""
     ip: str
@@ -141,8 +140,6 @@ class CfstRunOut(BaseModel):
     task_id: str
     message: str = "测速任务已提交"
 
-
-
 # ==================== Hosts ====================
 
 
@@ -155,7 +152,6 @@ class HostsSourceIn(BaseModel):
 
 class HostsSourceOut(HostsSourceIn):
     id: str
-
 
 
 class HostsSourceCreateOut(BaseModel):
@@ -173,7 +169,6 @@ class HostsSourceUpdateIn(BaseModel):
     name: Optional[str] = None
     url: Optional[str] = None
     enabled: Optional[bool] = None
-
 
 
 class HostsSourceDeleteOut(BaseModel):
@@ -222,8 +217,6 @@ class TrackerOut(TrackerIn):
     """Tracker 配置（响应）"""
     id: str
     ip: Optional[str] = None
-
-
 
 
 class TrackerCreateOut(BaseModel):
@@ -294,7 +287,6 @@ class TrackerCloudflareDomainsOut(BaseModel):
     total: int = 0
 
 # ==================== Downloader ====================
-
 
 
 class DownloaderIn(BaseModel):

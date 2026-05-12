@@ -13,7 +13,6 @@ API 列表：
 from fastapi import APIRouter, Depends, HTTPException
 
 from app.auth import verify_session
-from app.config import config
 from app.models import (
     ApiResponse,
     TrackerIn,
@@ -36,6 +35,7 @@ from app.models import (
 
 from app.services.cloudflare_detector import cloudflare_detector
 from app.services.tracker_service import tracker_service
+from app.services.tracker_store import tracker_store
 
 from app.utils.logger import get_logger
 
@@ -56,12 +56,7 @@ def _normalize_cloudflare_domains(domains: list[str] | tuple[str, ...] | set[str
 
 
 def _get_cloudflare_domains() -> list[str]:
-    configured = config.get("cloudflare_domains", default=[])
-    if isinstance(configured, str):
-        configured = [configured]
-    if not isinstance(configured, list):
-        configured = []
-    return _normalize_cloudflare_domains(configured)
+    return _normalize_cloudflare_domains(tracker_store.load_cloudflare_domains())
 
 
 def _serialize_tracker(tracker: dict) -> dict:
@@ -128,8 +123,7 @@ async def update_cloudflare_domains(
     更新 Cloudflare 域名名单
     """
     domains = _normalize_cloudflare_domains(req.domains)
-    config.set("cloudflare_domains", domains)
-    config.save()
+    tracker_store.save_cloudflare_domains(domains)
     tracker_service.sync_cloudflare_flags()
     logger.info(f"Cloudflare 域名名单已更新，操作用户：{session['username']}，数量：{len(domains)}")
     return ApiResponse(

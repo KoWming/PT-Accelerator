@@ -16,7 +16,7 @@ services:
       - TZ=Asia/Shanghai
       - APP_PORT=23333
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:$APP_PORT/api/health"]
+      test: ["CMD-SHELL", "curl -f http://localhost:$$APP_PORT/api/health"]
       interval: 30s
       timeout: 10s
       retries: 3

@@ -28,8 +28,10 @@ from app.config import config
 from app.services import scheduler_service
 from app.utils.cfst_installer import CfstInstaller
 from app.utils.logger import get_logger
+from version import get_version
 
 logger = get_logger(__name__)
+APP_VERSION = get_version()
 
 
 @asynccontextmanager
@@ -58,7 +60,7 @@ async def lifespan(_app: FastAPI):
 # 创建 FastAPI 实例
 app = FastAPI(
     title="PT-Accelerator",
-    version=config.get("app.version", "3.0.2"),
+    version=config.get("app.version", APP_VERSION),
     debug=config.get("app.debug", False),
     lifespan=lifespan,
 )

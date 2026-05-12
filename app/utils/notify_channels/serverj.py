@@ -33,7 +33,7 @@ class ServerJChannel:
         }
 
         try:
-            with httpx.Client(timeout=15) as client:
+            with httpx.Client(timeout=30) as client:
                 response = client.post(url, data=payload)
                 data = response.json() if response.content else {}
                 if response.is_success and (data.get("errno") == 0 or data.get("code") == 0):

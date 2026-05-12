@@ -97,7 +97,7 @@ async def update_config(request: dict, session: dict = Depends(verify_session)):
 
     # 逐个验证点号路径是否合法
     valid_toplevel = {
-        "app", "auth", "cfst", "hosts", "trackers", "cloudflare_domains",
+        "app", "auth", "cfst", "hosts", "trackers",
         "downloaders", "scheduler", "backup", "notify", "ikuai", "mihosts",
     }
 

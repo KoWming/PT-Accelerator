@@ -23,6 +23,7 @@ from app.services.cfst_service import cfst_service
 
 from app.services.hosts_service import HostsService
 from app.services.notify_service import build_structured_notification, notify_service
+from app.services.tracker_store import tracker_store
 from app.services.tracker_service import tracker_service, _normalize_target
 from app.utils.logger import get_logger
 
@@ -70,6 +71,7 @@ class CfstPipeline:
             "errors": [],
         }
         pending_hosts_pipeline: tuple[HostsPipeline, list[dict], dict[str, str], dict] | None = None
+        notification_sent = False
 
         try:
             logger.info(f"CFST 任务已启动: {task_id}")
@@ -100,6 +102,7 @@ class CfstPipeline:
             result["best_ip"] = best_ip
 
             ip_map = self._build_ip_map(trackers=trackers, best_ip=best_ip)
+            ip_map.update(self._build_cloudflare_domain_ip_map(best_ip=best_ip, trackers=trackers))
             result["ip_map"] = ip_map
 
             if best_ip:
@@ -118,6 +121,7 @@ class CfstPipeline:
             sources = self._hosts.list_sources()
             enabled_sources = [source for source in sources if source.get("enabled", True)]
             auto_update_hosts = bool(config.get("hosts.auto_update", default=True))
+            skip_hosts_reason = None
             if ip_map and auto_update_hosts:
                 hosts_pipeline = HostsPipeline()
                 pending_hosts_pipeline = (
@@ -138,12 +142,21 @@ class CfstPipeline:
                 else:
                     logger.info(f"CFST 管线准备启动 Hosts 更新：未配置启用的 hosts 源，将仅写入 PT-Tracker 分区（tracker 映射 {len(ip_map)} 条）")
             elif not ip_map:
+                skip_hosts_reason = "未获取到可用于 Hosts 更新的最优 IP"
                 logger.warning("CFST 管线跳过 Hosts 更新：没有可用的全局最优 IP")
             else:
+                skip_hosts_reason = "Hosts 自动更新已关闭"
                 logger.info("CFST 管线跳过 Hosts 更新：hosts.auto_update 已关闭")
 
             if pending_hosts_pipeline is None:
-                self._send_notification(len(results), success=result["success"])
+                self._send_notification(
+                    len(results),
+                    success=result["success"],
+                    best_ip=best_ip,
+                    skip_hosts_reason=skip_hosts_reason,
+                    failure_reason=result["errors"][0] if result["errors"] else None,
+                )
+                notification_sent = True
 
         except Exception as e:
             result["success"] = False
@@ -151,6 +164,15 @@ class CfstPipeline:
             logger.error(f"CFST 管线异常：{e}")
 
         result["duration_seconds"] = round(time.perf_counter() - started_at, 2)
+
+        if pending_hosts_pipeline is None and not notification_sent:
+            self._send_notification(
+                len(result.get("results", [])),
+                success=result["success"],
+                best_ip=result.get("best_ip"),
+                skip_hosts_reason=None,
+                failure_reason=result["errors"][0] if result["errors"] else None,
+            )
 
         if pending_hosts_pipeline is not None:
             hosts_pipeline, enabled_sources, tracker_ip_map, notify_context = pending_hosts_pipeline
@@ -173,6 +195,31 @@ class CfstPipeline:
             }
             for tracker in trackers
         }
+
+    @staticmethod
+    def _build_cloudflare_domain_ip_map(best_ip: str | None, trackers: list[str]) -> dict[str, dict]:
+        """将 Cloudflare 域名名单中未建 Tracker 的域名补充到 Hosts 写入映射。"""
+        if not best_ip:
+            return {}
+
+        existing_targets = {
+            _normalize_target(tracker)
+            for tracker in trackers
+            if _normalize_target(tracker)
+        }
+        cloudflare_domains = tracker_store.load_cloudflare_domains()
+        mapping: dict[str, dict] = {}
+
+        for domain in cloudflare_domains:
+            normalized_target = _normalize_target(domain)
+            if not normalized_target or normalized_target in existing_targets:
+                continue
+            mapping[normalized_target] = {
+                "ip": best_ip,
+                "source": "cloudflare_domain_whitelist",
+            }
+
+        return mapping
 
     @staticmethod
     def _collect_previous_tracker_ip(trackers: list[str]) -> str | None:
@@ -248,18 +295,39 @@ class CfstPipeline:
         t = threading.Thread(target=_target, daemon=True, name="hosts-pipeline-bg")
         t.start()
 
-    def _send_notification(self, result_count: int, success: bool = True):
-        """发送测速完成通知。"""
+    def _send_notification(
+        self,
+        result_count: int,
+        success: bool = True,
+        best_ip: str | None = None,
+        skip_hosts_reason: str | None = None,
+        failure_reason: str | None = None,
+    ):
+        """发送 CFST 通知，并在未继续 Hosts 更新时说明原因。"""
         try:
+            detail_items = [
+                ("结果数", result_count),
+                ("最优 IP", best_ip or "无"),
+            ]
+            result_text = "任务完成" if success else "任务失败"
+
+            if skip_hosts_reason:
+                detail_items.extend([
+                    ("Hosts 状态", "已跳过更新"),
+                    ("跳过原因", skip_hosts_reason),
+                ])
+                result_text = "测速完成，未继续 Hosts 更新" if success else "任务失败"
+
+            if not success and failure_reason:
+                detail_items.append(("失败原因", failure_reason))
+
             title, message = build_structured_notification(
                 header="CFST测速",
                 task_type="CFST测速",
                 success=success,
                 detail_title="测速结果",
-                detail_items=[
-                    ("结果数", result_count),
-                ],
-                result_text="任务完成" if success else "任务失败",
+                detail_items=detail_items,
+                result_text=result_text,
                 push_time=datetime.now(),
             )
             notify_service.send(

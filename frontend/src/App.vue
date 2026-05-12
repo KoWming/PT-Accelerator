@@ -50,6 +50,7 @@ const isLoginPage = computed(() => route.path === '/login');
 const sidebarOpen = ref(false);
 const hitokotoText = ref('妹妹说紫色很有韵味！');
 const isFetchingHitokoto = ref(false);
+const VERSION_FALLBACK_TEXT = 'v未知版本';
 
 const getSystemPrefersDark = () => {
   if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
@@ -126,13 +127,13 @@ onMounted(async () => {
             const result = await response.json();
             // 适配 ApiResponse 格式：{ data: { version: "x.x.x" } }
             const version = result?.data?.version || result?.version;
-            appVersion.value = 'v' + version;
+            appVersion.value = version ? 'v' + version : VERSION_FALLBACK_TEXT;
         } else {
-          appVersion.value = 'v2.2.1'; // Fallback
+          appVersion.value = VERSION_FALLBACK_TEXT;
         }
     } catch (e) {
         console.error('Failed to fetch version', e);
-        appVersion.value = 'v2.2.1'; // Fallback
+        appVersion.value = VERSION_FALLBACK_TEXT;
     }
 });
 </script>

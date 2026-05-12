@@ -186,7 +186,7 @@ services:
       - TZ=Asia/Shanghai
       - APP_PORT=23333
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:$APP_PORT/api/health"]
+      test: ["CMD-SHELL", "curl -f http://localhost:$$APP_PORT/api/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -320,9 +320,25 @@ docker build -t pt-accelerator:new .
 
 ## 🏷️ 版本信息
 
-当前项目版本：`3.0.2`
+当前项目版本：`3.0.3`
 
 ### 更新日志
+
+#### v3.0.3 (2026-05-12)
+
+**🐛 Bug 修复**
+- 修复 CFST 设置中的测速 URL 留空后仍被自动写回默认地址的问题
+- 修复应用升级后 `config.yaml` 中 `app.version` 不会自动同步到当前程序版本的问题
+- 修复前端版本获取失败时仍显示过期 fallback 版本号的问题
+
+**✨ 功能优化**
+- Cloudflare 域名名单迁移到 `config/trackers.yaml` 中统一存储，不再保留 `config.yaml` 的 `cloudflare_domains` 字段
+- Cloudflare 域名名单中的域名即使不是 Tracker，也可在 CFST 优选后写入系统 Hosts
+- 优化 `IP优选与Hosts更新` 通知样式，补充 Hosts 源统计、探测成功数、失败兜底数与失败兜底域名展示
+- 优化 `CFST测速` 单独通知语义，在跳过 Hosts 更新或执行失败时展示更明确的状态与原因
+
+<details>
+<summary>查看历史更新日志</summary>
 
 #### v3.0.2 (2026-05-10)
 
@@ -344,6 +360,16 @@ docker build -t pt-accelerator:new .
 
 **💄 UI 优化**
 - 移动端 Cloudflare 域名名单：IP 与域名显示在同一行
+
+#### v3.0.1 (2026-05-07)
+ 
+**🐛 Bug 修复**
+- 修复定时任务 Cron 表达式时区偏移问题
+
+**💄 UI 优化**
+- 优化移动端 UI 显示效果，改善小屏设备下的布局适配与交互体验
+
+</details>
 
 ## 📄 许可证
 
