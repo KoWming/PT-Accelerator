@@ -7,6 +7,7 @@ interface AuthStatusResponse {
     username?: string;
     user?: { username: string };
     initialized?: boolean;
+    auth_state?: 'UNINITIALIZED' | 'INITIALIZED' | 'BROKEN';
 }
 
 export const useAuthStore = defineStore('auth', {
@@ -14,6 +15,7 @@ export const useAuthStore = defineStore('auth', {
         user: null as { username: string } | null,
         isAuthenticated: false,
         initialized: false,
+        authState: 'UNINITIALIZED' as 'UNINITIALIZED' | 'INITIALIZED' | 'BROKEN',
     }),
     actions: {
         async login(data: LoginRequest) {
@@ -56,10 +58,12 @@ export const useAuthStore = defineStore('auth', {
                 }
 
                 this.initialized = statusData?.initialized ?? true;
+                this.authState = statusData?.auth_state || (this.initialized ? 'INITIALIZED' : 'UNINITIALIZED');
             } catch (error) {
                 this.isAuthenticated = false;
                 this.user = null;
                 this.initialized = false;
+                this.authState = 'UNINITIALIZED';
             }
         }
     },

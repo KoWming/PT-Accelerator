@@ -1,12 +1,14 @@
 """
 爱快 DNS 路由
 """
-from fastapi import APIRouter, Response
+from fastapi import APIRouter, Response, Depends
 from typing import Any
 from urllib.parse import urlparse
 
+from app.auth import verify_session, verify_csrf_token
 from app.config import config
 from app.services.ikuai_service import IkuaiService
+from app.utils.secret_crypto import encrypt_secret, decrypt_secret
 
 router = APIRouter(tags=["爱快DNS"])
 
@@ -49,13 +51,13 @@ def _get_ikuai_service() -> IkuaiService | None:
         host=config.get("ikuai.host", ""),
         port=None,
         username=config.get("ikuai.username", "admin"),
-        password=config.get("ikuai.password", ""),
+        password=decrypt_secret(config.get("ikuai.password", "")),
     )
     return service
 
 
 @router.get("/status")
-def get_status():
+def get_status(session: dict = Depends(verify_session)):
     """
     获取爱快 DNS 配置状态
     """
@@ -73,7 +75,7 @@ def get_status():
 
 
 @router.post("/test")
-def test_connection(body: dict | None = None):
+def test_connection(body: dict | None = None, session: dict = Depends(verify_session), _csrf: None = Depends(verify_csrf_token)):
     """
     测试爱快路由器连接
     """
@@ -81,7 +83,8 @@ def test_connection(body: dict | None = None):
 
     host = body.get("host", "") or config.get("ikuai.host", "")
     username = body.get("username", "admin") or config.get("ikuai.username", "admin")
-    password = body.get("password", "") or config.get("ikuai.password", "")
+    # 若 body 中没有传入新密码，从配置中读取并解密
+    password = body.get("password", "") or decrypt_secret(config.get("ikuai.password", ""))
     port = body.get("port")
     if port is None:
         port = None
@@ -117,7 +120,7 @@ def test_connection(body: dict | None = None):
 
 
 @router.get("/records")
-def get_records():
+def get_records(session: dict = Depends(verify_session)):
     """
     获取爱快 DNS 记录列表
     """
@@ -133,7 +136,7 @@ def get_records():
 
 
 @router.post("/sync")
-def sync_dns(hosts: list[dict]):
+def sync_dns(hosts: list[dict], session: dict = Depends(verify_session), _csrf: None = Depends(verify_csrf_token)):
     """
     同步 hosts 到爱快 DNS
 
@@ -158,7 +161,7 @@ def sync_dns(hosts: list[dict]):
 
 
 @router.post("/sync-now")
-def sync_now():
+def sync_now(session: dict = Depends(verify_session), _csrf: None = Depends(verify_csrf_token)):
     """
     手动立即同步：读取当前 CFST 最优 IP，将 Cloudflare Tracker 记录写入爱快 DNS。
     不需要重新跑 CFST，直接复用上次的缓存结果。
@@ -216,7 +219,7 @@ def sync_now():
 
 
 @router.post("/save")
-def save_config(body: dict):
+def save_config(body: dict, session: dict = Depends(verify_session), _csrf: None = Depends(verify_csrf_token)):
     """
     保存爱快 DNS 配置
 
@@ -238,9 +241,9 @@ def save_config(body: dict):
     _remove_config_key(config._data, "ikuai.port")
     _remove_config_key(config._data, "ikuai.use_https")
 
-    # 只有密码不为空时才更新
+    # 只有密码不为空时才更新，写入前加密
     if password:
-        config.set("ikuai.password", password)
+        config.set("ikuai.password", encrypt_secret(password))
 
     config.save()
 
@@ -260,7 +263,7 @@ def save_config(body: dict):
 
 
 @router.post("/export-dns")
-def export_dns():
+def export_dns(session: dict = Depends(verify_session), _csrf: None = Depends(verify_csrf_token)):
     """
     导出爱快 DNS 配置为 TXT 文件并返回文件内容。
     """
@@ -282,7 +285,7 @@ def export_dns():
 
 
 @router.post("/import-dns")
-async def import_dns(body: dict):
+async def import_dns(body: dict, session: dict = Depends(verify_session), _csrf: None = Depends(verify_csrf_token)):
     """
     从 Base64 编码的 TXT 文件内容导入 DNS 记录。
 
@@ -317,7 +320,7 @@ async def import_dns(body: dict):
 
 
 @router.post("/delete-record")
-def delete_record(body: dict):
+def delete_record(body: dict, session: dict = Depends(verify_session), _csrf: None = Depends(verify_csrf_token)):
     """
     删除指定 DNS 记录。
 
@@ -341,7 +344,7 @@ def delete_record(body: dict):
         return {"success": False, "message": "DNS 记录删除失败，请检查爱快路由器连接"}
 
 @router.post("/toggle-record")
-def toggle_record(body: dict):
+def toggle_record(body: dict, session: dict = Depends(verify_session), _csrf: None = Depends(verify_csrf_token)):
     """
     启用或停用指定 DNS 记录。
 

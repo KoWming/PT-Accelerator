@@ -12,7 +12,7 @@ API 列表：
 """
 from fastapi import APIRouter, Depends, HTTPException
 
-from app.auth import verify_session
+from app.auth import verify_session, verify_csrf_token
 from app.models import (
     ApiResponse,
     TrackerIn,
@@ -118,6 +118,7 @@ async def list_cloudflare_domains(session: dict = Depends(verify_session)):
 async def update_cloudflare_domains(
     req: TrackerCloudflareDomainsIn,
     session: dict = Depends(verify_session),
+    _csrf: None = Depends(verify_csrf_token),
 ):
     """
     更新 Cloudflare 域名名单
@@ -140,6 +141,7 @@ async def batch_update_trackers_ip(
 
     req: TrackerBatchUpdateIpIn,
     session: dict = Depends(verify_session),
+    _csrf: None = Depends(verify_csrf_token),
 ):
     """
     批量更新全部 tracker 的当前 IP
@@ -175,6 +177,7 @@ async def get_tracker(tracker_id: str, session: dict = Depends(verify_session)):
 async def add_tracker(
     req: TrackerIn,
     session: dict = Depends(verify_session),
+    _csrf: None = Depends(verify_csrf_token),
 ):
     """
     新增单个 tracker
@@ -207,6 +210,7 @@ async def update_tracker(
     tracker_id: str,
     req: TrackerIn,
     session: dict = Depends(verify_session),
+    _csrf: None = Depends(verify_csrf_token),
 ):
     """
     更新 tracker
@@ -239,6 +243,7 @@ async def update_tracker(
 async def delete_tracker(
     tracker_id: str,
     session: dict = Depends(verify_session),
+    _csrf: None = Depends(verify_csrf_token),
 ):
     """
     删除 tracker
@@ -257,7 +262,7 @@ async def delete_tracker(
 @router.delete("/", response_model=ApiResponse)
 
 
-async def clear_all_trackers(session: dict = Depends(verify_session)):
+async def clear_all_trackers(session: dict = Depends(verify_session), _csrf: None = Depends(verify_csrf_token)):
     """
     清空全部 tracker
     """
@@ -276,6 +281,7 @@ async def clear_all_trackers(session: dict = Depends(verify_session)):
 async def batch_import_trackers(
     req: TrackerBatchImportIn,
     session: dict = Depends(verify_session),
+    _csrf: None = Depends(verify_csrf_token),
 ):
     """
     批量导入 tracker

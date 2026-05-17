@@ -157,7 +157,42 @@ PT-Accelerator-New/
 
 应用默认监听端口：`23333`
 
-如需修改端口，可设置环境变量 `APP_PORT`。
+如需修改端口或其他行为，可通过环境变量配置，详见 [🌐 环境变量](#-环境变量) 章节。
+
+## 🔐 管理员离线恢复
+
+当前管理员离线恢复已加固为三重门槛：
+
+1. 必须在服务器本机环境中设置 `ADMIN_RESET_KEY`
+2. 必须存在本机恢复令牌文件 `config/.admin_reset_token`
+3. 必须通过交互式方式输入两次新密码
+
+### 首次令牌文件生成
+
+- 若你在首次初始化或后续在线改密时已经设置了 `ADMIN_RESET_KEY`，系统会自动：
+  - 生成随机本机恢复令牌文件 `config/.admin_reset_token`
+  - 将 `ADMIN_RESET_KEY` 的哈希与恢复令牌哈希写入 `config.yaml` 的 `auth.reset_key_hash` / `auth.reset_token_hash`
+- 若当时没有设置 `ADMIN_RESET_KEY`，则不会生成离线恢复材料；此时需要先在已登录状态下设置 `ADMIN_RESET_KEY` 并执行一次在线改密，才能完成离线恢复材料绑定
+- 一旦完成绑定，后续若 `config/.admin_reset_token` 缺失、被替换，或 `ADMIN_RESET_KEY` 与已绑定值不一致，系统会拒绝离线重置
+- 请将该文件与 `config.yaml`、`.secret_key` 一样视为高敏感部署资产，仅允许部署账号读写
+
+### 使用方式
+
+Linux/macOS：
+
+```bash
+export ADMIN_RESET_KEY='<16位强随机密钥>'
+python main.py --reset-admin --username admin
+```
+
+Windows PowerShell：
+
+```powershell
+$env:ADMIN_RESET_KEY = '<16位强随机密钥>'
+python main.py --reset-admin --username admin
+```
+
+执行后程序会交互式提示输入两次新密码；若 `ADMIN_RESET_KEY` 缺失、与已绑定的恢复密钥哈希不一致，或本机恢复令牌文件 `config/.admin_reset_token` 缺失/被替换，离线重置会被拒绝。
 
 ## 🐳 Docker 部署
 
@@ -185,6 +220,7 @@ services:
     environment:
       - TZ=Asia/Shanghai
       - APP_PORT=23333
+      - ADMIN_RESET_KEY=<16位强随机密钥> #建议设置，启用管理员离线恢复功能
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:$$APP_PORT/api/health"]
       interval: 30s
@@ -207,9 +243,13 @@ docker compose up -d
 - `./logs:/app/logs`       #运行日志
 - `./cache:/app/cache`     #缓存数据
 
-可通过环境变量覆盖端口：
+可通过环境变量配置应用行为，完整说明见 [🌐 环境变量](#-环境变量) 章节。
 
-- `APP_PORT=23333`
+Docker 部署常用环境变量：
+
+- `APP_PORT=23333` — 应用监听端口
+- `ADMIN_RESET_KEY=<16位强随机密钥>` — 管理员离线恢复密钥
+- `TZ=Asia/Shanghai` — 容器时区
 
 容器健康检查接口：
 
@@ -226,6 +266,7 @@ docker run -d \
 	--network host \
 	-e TZ=Asia/Shanghai \
 	-e APP_PORT=23333 \
+	-e ADMIN_RESET_KEY=<16位强随机密钥> \
 	-v /etc/hosts:/etc/hosts \
 	-v ./CFST:/app/CFST \
 	-v ./config:/app/config \
@@ -271,14 +312,60 @@ docker build -t pt-accelerator:new .
 - `/api/logs`：日志查看
 - `/api/settings`：系统设置
 
+## 🌐 环境变量
+
+| 变量名 | 默认值 | 必需 | 说明 |
+|--------|--------|------|------|
+| `APP_PORT` | `23333` | 否 | 应用监听端口 |
+| `ADMIN_RESET_KEY` | _(空)_ | 离线重置时必需 | 管理员离线恢复密钥，用于三重校验绑定与离线重置授权；生产环境建议固定设置并妥善保管 |
+| `APP_SECRET_KEY` | 自动生成 | 否 | 敏感配置加密密钥（AES-128-GCM），用于加密 config.yaml 中的密码、Token 等敏感字段；未设置时自动生成并存储到 `config/.secret_key` |
+| `CONFIG_DIR` | `config` | 否 | 配置文件目录路径 |
+| `COOKIE_SECURE` | `false` | 否 | 启用 Cookie Secure 标记，HTTPS 部署时建议开启（`true` / `1` / `yes`） |
+| `ALLOW_REMOTE_INIT` | `false` | 否 | 允许远程 IP 进行首次管理员初始化，默认仅限本机（`true` / `1` / `yes`），**不建议在生产环境开启** |
+| `LOGIN_MAX_FAILURES` | `5` | 否 | 同一 IP 连续登录失败次数上限，超出后触发锁定 |
+| `LOGIN_LOCKOUT_SECONDS` | `300` | 否 | 登录锁定持续时间（秒），锁定期间该 IP 无法尝试登录 |
+| `CORS_ORIGINS` | _(空)_ | 否 | 额外允许的 CORS 来源，多个用逗号分隔（如 `https://a.com,https://b.com`） |
+| `ENABLE_OPENAPI_DOCS` | `false` | 否 | 启用 OpenAPI 文档（`/docs`、`/redoc`），生产环境不建议开启（`true` / `1` / `yes`） |
+| `EXTRA_HOSTS_PATHS` | _(空)_ | 否 | 额外允许写入的 Hosts 文件路径，多个用分号分隔（如 `/custom/hosts1;/custom/hosts2`） |
+| `TRUSTED_PROXY_IPS` | _(空)_ | 否 | 受信任反向代理 IP 白名单，多个用英文逗号分隔。仅当直连来源属于该白名单时，后端才会解析 `X-Forwarded-For` / `X-Real-IP`；未设置时默认只信任直连客户端 IP |
+| `TZ` | 系统默认 | Docker 部署建议设置 | 容器时区（如 `Asia/Shanghai`），影响日志时间戳与通知时间 |
+
+### 环境变量说明
+
+- **布尔类型**变量接受 `true` / `1` / `yes`（不区分大小写）为真值，其余为假
+- **`APP_SECRET_KEY`** 支持 Base64 编码格式或原始字符串（取前 16 字节用于 AES-128）；生产环境建议通过环境变量固定设置，避免自动生成的密钥文件丢失后无法解密已有配置
+- **`ADMIN_RESET_KEY`** 仅在需要使用离线管理员重置功能时必须设置；设置后需在已登录状态下完成一次在线改密，系统才会绑定恢复材料到 config.yaml
+- **`TRUSTED_PROXY_IPS`** 用于声明哪些反向代理来源可被信任；只有这些来源转发的 `X-Forwarded-For` / `X-Real-IP` 才会参与客户端 IP 判定，避免被客户端伪造请求头绕过初始化来源限制或登录限流
+- 登录成功后当前版本**仅依赖 HttpOnly Cookie 维持会话**，不再返回可复用的 session token
+
 ## ⚙️ 配置说明
 
 ### 配置目录
 
 - `config/config.yaml`：主配置文件
+- `config/trackers.yaml`：Tracker / Cloudflare 域名名单配置
 - `config/.schema_version`：配置结构版本标记
+- `config/.secret_key`：敏感配置加密密钥文件，用于解密 `config.yaml` 中的密码、Token 等敏感字段
+- `config/.auth_initialized`：认证初始化状态标记文件，用于辅助判断当前部署是否已完成管理员初始化
+- `config/.admin_reset_token`：本机离线恢复令牌文件，离线管理员重置必需，请视为高敏感部署资产妥善保存
 
 首次启动时，程序会自动初始化默认配置。
+
+### 配置备份建议
+
+建议至少同时备份以下文件：
+
+- `config/config.yaml`
+- `config/trackers.yaml`
+- `config/.secret_key`
+- `config/.admin_reset_token`
+
+说明：
+
+- 系统自动备份当前仅包含 `config/config.yaml`，不会自动备份其他敏感文件，请自行妥善保管 `config/.secret_key`、`config/.admin_reset_token` 等部署安全材料
+- 若只备份 `config.yaml` 而未备份 `config/.secret_key`，可能导致历史敏感配置无法解密
+- 若已绑定离线恢复材料但缺失 `config/.admin_reset_token`，离线管理员重置会被拒绝
+- `config/.auth_initialized` 与 `config/.schema_version` 通常可自动重建，但保留备份更稳妥
 
 ### 数据目录用途
 
@@ -320,9 +407,39 @@ docker build -t pt-accelerator:new .
 
 ## 🏷️ 版本信息
 
-当前项目版本：`3.0.4`
+当前项目版本：`3.0.5`
 
 ### 更新日志
+
+#### v3.0.5 (2026-05-17)
+
+**🔐 认证与会话安全**
+- 管理员登录改为单会话模式：同一账号新登录会自动撤销旧会话
+- 管理员修改密码后会立即撤销该账号全部旧会话，强制重新登录
+- 登录态校验改为仅信任 HttpOnly Cookie，不再兼容通过响应体或 `Authorization` 传递会话 ID
+- 登录成功响应不再返回 `token=session_id`，收敛会话标识暴露面
+- 启动时存在 0 个本地会话时不再输出无意义日志
+
+**🛡️ 请求防护与响应加固**
+- 为所有基于 Cookie 会话的写接口统一补齐 CSRF 校验，覆盖认证、备份、CFST、下载器、Hosts、爱快、小米路由器、通知、调度器、Tracker、日志清理等状态变更操作
+- 前端 `axios` 统一接入 CSRF：自动获取 `csrf_token`，并为 `POST` / `PUT` / `PATCH` / `DELETE` 请求自动注入 `X-CSRF-Token`
+- `/api/settings/config` 配置脱敏递归增强：补齐 `list` 结构递归处理，并覆盖 `apikey` 等敏感字段，避免密文/明文敏感配置回显到前端
+- 后端统一补充基础安全响应头：`Content-Security-Policy`、`X-Frame-Options`、`X-Content-Type-Options`、`Referrer-Policy`、`Permissions-Policy`
+- 前端所有 `target="_blank"` 外链统一补齐 `rel="noopener noreferrer"`
+
+**🌐 网络与敏感数据安全**
+- `get_client_ip()` 改为默认仅信任直连来源 IP，只有在配置 `TRUSTED_PROXY_IPS` 后才解析 `X-Forwarded-For` / `X-Real-IP`
+- 敏感配置写入改为 fail-closed：缺少 `cryptography` 或加密失败时拒绝写入，不再静默降级到 XOR/明文；旧版 XOR 数据仍保留解密兼容
+- Cloudflare HTTP 探测恢复 TLS 证书校验，移除 `verify=False`
+
+**🧰 离线恢复与文档完善**
+- 管理员离线重置收紧为“三重门槛”：`ADMIN_RESET_KEY`、本机恢复令牌文件、交互式二次密码确认缺一不可
+- 离线管理员重置 CLI 的预期失败改为错误日志输出，不再直接抛 traceback
+- 为离线管理员重置失败日志统一增加 `[offline-reset]` 前缀，便于检索与告警
+- README 新增环境变量章节，补充 `APP_SECRET_KEY`、`ADMIN_RESET_KEY`、`TRUSTED_PROXY_IPS`、`COOKIE_SECURE`、`ALLOW_REMOTE_INIT` 等说明
+
+<details>
+<summary>查看历史更新日志</summary>
 
 #### v3.0.4 (2026-05-12)
 
@@ -332,9 +449,6 @@ docker build -t pt-accelerator:new .
 - `qBittorrent` 新增 API Key 认证支持，兼容新版 WebUI 鉴权方式
 - 清理 Transmission 旧版兼容逻辑，仅保留基于最新依赖的实现
 - 优化 `start.bat` 与 `start.sh` 启动脚本，统一为 `python main.py` 入口并增强启动日志展示
-
-<details>
-<summary>查看历史更新日志</summary>
 
 #### v3.0.3 (2026-05-12)
 

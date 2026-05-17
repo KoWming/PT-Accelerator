@@ -10,7 +10,7 @@ API 列表：
 """
 from fastapi import APIRouter, Depends, HTTPException
 
-from app.auth import verify_session
+from app.auth import verify_session, verify_csrf_token
 from app.config import config
 from app.models import (
 
@@ -35,6 +35,7 @@ logger = get_logger(__name__)
 async def run_cfst(
     body: CfstRunIn,
     session: dict = Depends(verify_session),
+    _csrf: None = Depends(verify_csrf_token),
 ):
     """手动触发 CloudflareSpeedTest。"""
     _ = body
@@ -128,6 +129,7 @@ async def get_cfst_config(session: dict = Depends(verify_session)):
 async def update_cfst_config(
     req: CfstConfigIn,
     session: dict = Depends(verify_session),
+    _csrf: None = Depends(verify_csrf_token),
 ):
     """更新 CFST 参数配置。"""
     if req.min_delay > req.max_delay:

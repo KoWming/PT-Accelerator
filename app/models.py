@@ -2,9 +2,10 @@
 Pydantic 数据模型（请求 / 响应 / 内部模型）
 Phase 5：补充 request/response wrapper + Pipeline 状态模型
 """
+import re
 from datetime import datetime
 from typing import Optional, Any
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 # ==================== 通用 ====================
@@ -46,7 +47,22 @@ class LoginResponse(BaseModel):
 
 class PasswordChangeRequest(BaseModel):
     old_password: Optional[str] = None
-    new_password: str = Field(min_length=1, max_length=128)
+    new_password: str = Field(
+        description="密码至少 8 位，且同时包含字母和数字",
+    )
+
+    @field_validator("new_password")
+    @classmethod
+    def validate_password_strength(cls, v: str) -> str:
+        if len(v) < 8:
+            raise ValueError("密码长度不能少于 8 位")
+        if len(v) > 128:
+            raise ValueError("密码长度不能超过 128 位")
+        if not re.search(r'[A-Za-z]', v):
+            raise ValueError("密码必须包含至少一个字母")
+        if not re.search(r'\d', v):
+            raise ValueError("密码必须包含至少一个数字")
+        return v
 
 
 
@@ -74,7 +90,53 @@ class CfstConfigIn(BaseModel):
     test_all: bool = False
     disable_download: bool = False
     debug: bool = False
-    additional_args: str = ""
+    additional_args: str = Field(
+        default="",
+        max_length=256,
+        description="额外 CLI 参数，仅允许 CFST 官方参数白名单（防命令注入）",
+    )
+
+    @field_validator("additional_args")
+    @classmethod
+    def validate_additional_args(cls, v: str) -> str:
+        """
+        命令注入防护：仅允许形如 -flag 或 -flag value 的 CFST 官方参数，
+        拒绝 shell 特殊字符（; & | ` $ > < ! \\ 空格换行以外的控制字符等）。
+
+        允许示例："-ip ip.txt"  "-f ip6.txt"
+        拒绝示例："$(id)"  "; rm -rf /"  "-ip ip.txt && whoami"
+        """
+        if not v:
+            return v
+
+        # 拒绝所有 shell 注入特殊字符
+        _SHELL_INJECT_RE = re.compile(r'[;&|`$><!\\\r\n\x00-\x08\x0b-\x1f\x7f]')
+        if _SHELL_INJECT_RE.search(v):
+            raise ValueError(
+                "additional_args 包含非法字符（禁止 ; & | ` $ > < ! \\ 等 shell 特殊字符）"
+            )
+
+        # 白名单：仅允许 CFST 官方 CLI 标志（-开头的短标志），每段 token 须符合规范
+        # token 格式：以 - 开头的标志，或不含特殊字符的纯值（路径/URL/数字）
+        _ALLOWED_TOKEN_RE = re.compile(
+            r'^(-[a-zA-Z][a-zA-Z0-9\-]{0,30}|[a-zA-Z0-9_.:/\-]{1,256})$'
+        )
+        import shlex as _shlex
+        try:
+            tokens = _shlex.split(v, posix=False)
+        except ValueError as exc:
+            raise ValueError(f"additional_args 格式不合法：{exc}") from exc
+
+        for token in tokens:
+            # 去掉外层引号再校验
+            stripped = token.strip('"\'')
+            if not _ALLOWED_TOKEN_RE.match(stripped):
+                raise ValueError(
+                    f"additional_args 包含不合法的参数 token：{token!r}，"
+                    "仅允许形如 -flag 或 -flag value 的 CFST 官方参数"
+                )
+
+        return v
 
 
 class CfstConfigOut(BaseModel):

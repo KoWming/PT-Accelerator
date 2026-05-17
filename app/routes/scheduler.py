@@ -13,7 +13,7 @@ API 列表：
 """
 from fastapi import APIRouter, Depends, HTTPException
 
-from app.auth import verify_session
+from app.auth import verify_session, verify_csrf_token
 from app.models import ApiResponse, SchedulerJobIn, SchedulerJobOut, SchedulerJobListOut
 from app.services import scheduler_service
 from app.utils.logger import get_logger
@@ -50,6 +50,7 @@ async def list_jobs(session: dict = Depends(verify_session)):
 async def create_job(
     req: SchedulerJobIn,
     session: dict = Depends(verify_session),
+    _csrf: None = Depends(verify_csrf_token),
 ):
     """
     添加或更新调度任务
@@ -84,7 +85,7 @@ async def get_job(job_id: str, session: dict = Depends(verify_session)):
 
 
 @router.delete("/jobs/{job_id}", response_model=ApiResponse)
-async def delete_job(job_id: str, session: dict = Depends(verify_session)):
+async def delete_job(job_id: str, session: dict = Depends(verify_session), _csrf: None = Depends(verify_csrf_token)):
     """
     删除调度任务
     """
@@ -97,7 +98,7 @@ async def delete_job(job_id: str, session: dict = Depends(verify_session)):
 
 
 @router.post("/jobs/{job_id}/enable", response_model=ApiResponse)
-async def enable_job(job_id: str, session: dict = Depends(verify_session)):
+async def enable_job(job_id: str, session: dict = Depends(verify_session), _csrf: None = Depends(verify_csrf_token)):
     """
     启用调度任务
     """
@@ -110,7 +111,7 @@ async def enable_job(job_id: str, session: dict = Depends(verify_session)):
 
 
 @router.post("/jobs/{job_id}/disable", response_model=ApiResponse)
-async def disable_job(job_id: str, session: dict = Depends(verify_session)):
+async def disable_job(job_id: str, session: dict = Depends(verify_session), _csrf: None = Depends(verify_csrf_token)):
     """
     禁用调度任务（保留配置）
     """
@@ -123,7 +124,7 @@ async def disable_job(job_id: str, session: dict = Depends(verify_session)):
 
 
 @router.post("/jobs/{job_id}/run", response_model=ApiResponse)
-async def run_job(job_id: str, session: dict = Depends(verify_session)):
+async def run_job(job_id: str, session: dict = Depends(verify_session), _csrf: None = Depends(verify_csrf_token)):
     """
     手动触发任务执行（立即执行一次）
     """

@@ -308,7 +308,7 @@ class CloudflareDetector:
         for scheme in ("https", "http"):
             url = f"{scheme}://{host}"
             try:
-                with httpx.Client(timeout=HTTP_DETECT_TIMEOUT_SECONDS, verify=False, headers=DEFAULT_HTTP_HEADERS, follow_redirects=True) as client:
+                with httpx.Client(timeout=HTTP_DETECT_TIMEOUT_SECONDS, headers=DEFAULT_HTTP_HEADERS, follow_redirects=True) as client:
                     head_response = client.head(url)
                     if self._response_has_cloudflare_markers(head_response.headers):
                         return "http_headers"

@@ -20,14 +20,19 @@ export class AppError extends Error {
   }
 }
 
+const normalizePydanticMessage = (message: string) => message
+  .replace(/^Value error,\s*/i, '')
+  .replace(/^Assertion failed,\s*/i, '')
+  .trim();
+
 const stringifyUnknownRecord = (value: Record<string, unknown>) => {
-  if (typeof value.msg === 'string' && value.msg.trim()) return value.msg;
-  if (typeof value.message === 'string' && value.message.trim()) return value.message;
+  if (typeof value.msg === 'string' && value.msg.trim()) return normalizePydanticMessage(value.msg);
+  if (typeof value.message === 'string' && value.message.trim()) return normalizePydanticMessage(value.message);
   return JSON.stringify(value);
 };
 
 const extractErrorDetail = (detail: unknown): string | null => {
-  if (typeof detail === 'string' && detail.trim()) return detail;
+  if (typeof detail === 'string' && detail.trim()) return normalizePydanticMessage(detail);
 
   if (Array.isArray(detail)) {
     const normalized = detail
@@ -55,13 +60,15 @@ export const getErrorMessage = (error: unknown, fallback = '操作失败，请�
     const detailMessage = extractErrorDetail(error.response?.data?.detail);
     if (detailMessage) return detailMessage;
 
-    const responseMessage = typeof error.response?.data?.message === 'string' ? error.response.data.message.trim() : '';
+    const responseMessage = typeof error.response?.data?.message === 'string'
+      ? normalizePydanticMessage(error.response.data.message.trim())
+      : '';
     if (responseMessage) return responseMessage;
 
-    if (error.message) return error.message;
+    if (error.message) return normalizePydanticMessage(error.message);
   }
 
-  if (error instanceof Error && error.message) return error.message;
+  if (error instanceof Error && error.message) return normalizePydanticMessage(error.message);
   if (typeof error === 'string' && error.trim()) return error;
   return fallback;
 };

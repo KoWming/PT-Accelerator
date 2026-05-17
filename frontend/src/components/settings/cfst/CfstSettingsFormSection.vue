@@ -122,7 +122,7 @@
           <div class="settings-field-card">
             <label class="form-label settings-form-label">地区码过滤 (-cfcolo)</label>
             <input type="text" class="form-control settings-standalone-input" :value="cfstForm.cfcolo" placeholder="HKG,LAX,SEA" @input="updateStringField('cfcolo', ($event.target as HTMLInputElement).value)">
-            <div class="settings-field-hint">仅 HTTPing 模式可用；支持 <a href="https://www.cloudflarestatus.com/" target="_blank" rel="noreferrer">IATA 三字机场地区码</a> 或 <a href="https://zh.wikipedia.org/wiki/ISO_3166-1%E4%BA%8C%E4%BD%8D%E5%AD%97%E6%AF%8D%E4%BB%A3%E7%A0%81#%E6%AD%A3%E5%BC%8F%E5%88%86%E9%85%8D%E4%BB%A3%E7%A0%81" target="_blank" rel="noreferrer">二字国家码/城市码</a>，多个值用英文逗号分隔，大小写均可。</div>
+            <div class="settings-field-hint">仅 HTTPing 模式可用；支持 <a href="https://www.cloudflarestatus.com/" target="_blank" rel="noopener noreferrer">IATA 三字机场地区码</a> 或 <a href="https://zh.wikipedia.org/wiki/ISO_3166-1%E4%BA%8C%E4%BD%8D%E5%AD%97%E6%AF%8D%E4%BB%A3%E7%A0%81#%E6%AD%A3%E5%BC%8F%E5%88%86%E9%85%8D%E4%BB%A3%E7%A0%81" target="_blank" rel="noopener noreferrer">二字国家码/城市码</a>，多个值用英文逗号分隔，大小写均可。</div>
           </div>
         </div>
 

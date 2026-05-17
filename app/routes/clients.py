@@ -6,7 +6,7 @@ import uuid
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from app.auth import verify_session
+from app.auth import verify_session, verify_csrf_token
 from app.models import (
     ApiResponse,
     DownloaderIn,
@@ -88,6 +88,7 @@ async def get_client_types(session: dict = Depends(verify_session)):
 async def add_client(
     req: DownloaderIn,
     session: dict = Depends(verify_session),
+    _csrf: None = Depends(verify_csrf_token),
 ):
     """
     添加新的下载器客户端
@@ -121,7 +122,7 @@ async def add_client(
 
 
 @router.post("/import-trackers", response_model=ApiResponse)
-async def import_trackers(session: dict = Depends(verify_session)):
+async def import_trackers(session: dict = Depends(verify_session), _csrf: None = Depends(verify_csrf_token)):
     """
     从所有已启用下载器导入 Tracker 到当前 Tracker 列表
     """
@@ -155,6 +156,7 @@ async def update_client(
     client_id: str,
     req: DownloaderIn,
     session: dict = Depends(verify_session),
+    _csrf: None = Depends(verify_csrf_token),
 ):
     """
     更新下载器客户端
@@ -191,6 +193,7 @@ async def update_client(
 async def delete_client(
     client_id: str,
     session: dict = Depends(verify_session),
+    _csrf: None = Depends(verify_csrf_token),
 ):
     """
     删除下载器客户端
@@ -213,6 +216,7 @@ async def delete_client(
 async def test_client(
     client_id: str,
     session: dict = Depends(verify_session),
+    _csrf: None = Depends(verify_csrf_token),
 ):
     """
     测试下载器连接（已保存的客户端）
@@ -232,6 +236,7 @@ async def test_client(
 async def test_client_by_config(
     req: DownloaderTestIn,
     session: dict = Depends(verify_session),
+    _csrf: None = Depends(verify_csrf_token),
 ):
     """
     测试下载器连接（临时配置，不保存）

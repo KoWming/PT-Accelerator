@@ -3,8 +3,9 @@
 """
 from fastapi import APIRouter, Depends, HTTPException
 
-from app.auth import verify_session
+from app.auth import verify_session, verify_csrf_token
 from app.config import config
+from app.utils.secret_crypto import decrypt_secret
 from app.models import (
     ApiResponse,
     BackupConfigIn,
@@ -40,6 +41,7 @@ async def get_backup_config(session_: dict = Depends(verify_session)):
 async def update_backup_config(
     req: BackupConfigIn,
     session: dict = Depends(verify_session),
+    _csrf: None = Depends(verify_csrf_token),
 ):
     """
     更新备份配置
@@ -73,12 +75,14 @@ async def update_backup_config(
 async def test_webdav_connection(
     req: BackupTestIn,
     session: dict = Depends(verify_session),
+    _csrf: None = Depends(verify_csrf_token),
 ):
     """测试 WebDAV 连接，不保存配置。"""
     current_cfg = backup_service._get_config()
     password = req.webdav_password
     if not password:
-        password = current_cfg.get("webdav_password", "")
+        # 从配置读取时需要解密
+        password = decrypt_secret(current_cfg.get("webdav_password", ""))
 
     result = await backup_service.test_webdav_connection(
         webdav_url=req.webdav_url,
@@ -103,6 +107,7 @@ async def test_webdav_connection(
 async def run_backup(
     req: BackupCreateIn,
     session: dict = Depends(verify_session),
+    _csrf: None = Depends(verify_csrf_token),
 ):
     """
     手动触发备份
@@ -150,6 +155,7 @@ async def get_history(session_: dict = Depends(verify_session)):
 async def upload_backup(
     backup_id: str,
     session_: dict = Depends(verify_session),
+    _csrf: None = Depends(verify_csrf_token),
 ):
     """
     上传备份到 WebDAV
@@ -176,6 +182,7 @@ async def upload_backup(
 async def restore_backup(
     backup_id: str,
     session: dict = Depends(verify_session),
+    _csrf: None = Depends(verify_csrf_token),
 ):
     """
     从备份恢复
@@ -205,6 +212,7 @@ async def restore_backup(
 async def delete_backup(
     backup_id: str,
     session_: dict = Depends(verify_session),
+    _csrf: None = Depends(verify_csrf_token),
 ):
     """
     删除备份

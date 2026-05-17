@@ -20,6 +20,9 @@ pydantic>=2.6.0
 # 定时任务调度
 apscheduler>=3.10.4
 
+# 密码学：AES-128-GCM 加密（密码/凭据存储必需）
+cryptography>=42.0.0
+
 # 前端本地构建环境（提示用，非 pip 依赖）
 # node>=18.0.0
 # npm>=9.0.0

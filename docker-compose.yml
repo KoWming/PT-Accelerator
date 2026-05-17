@@ -15,6 +15,7 @@ services:
     environment:
       - TZ=Asia/Shanghai
       - APP_PORT=23333
+      - ADMIN_RESET_KEY=<16位强随机密钥>  #管理员离线恢复密钥
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:$$APP_PORT/api/health"]
       interval: 30s

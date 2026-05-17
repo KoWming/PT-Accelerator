@@ -2,13 +2,14 @@
 Hosts 路由：源管理、文件编辑、IP 查看
 """
 import asyncio
+import platform
 import threading
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException
+from pathlib import Path
 
-
-from app.auth import verify_session
+from app.auth import verify_session, verify_csrf_token
 from app.config import config
 
 
@@ -30,6 +31,20 @@ from app.utils.logger import get_logger
 
 router = APIRouter()
 logger = get_logger(__name__)
+
+# Hosts 路径白名单：仅允许写入标准系统 hosts 文件
+# 可通过环境变量 EXTRA_HOSTS_PATHS（换行符或分号分隔）追加额外路径
+import os as _os
+_ALLOWED_HOSTS_PATHS = {
+    Path("/etc/hosts").resolve(),
+    Path("C:\\Windows\\System32\\drivers\\etc\\hosts").resolve(),
+}
+_extra_hosts_paths = _os.environ.get("EXTRA_HOSTS_PATHS", "")
+if _extra_hosts_paths:
+    for _ep in _extra_hosts_paths.replace(";", "\n").splitlines():
+        _ep = _ep.strip()
+        if _ep:
+            _ALLOWED_HOSTS_PATHS.add(Path(_ep).resolve())
 
 # 全局服务实例（延迟初始化）
 _hosts_service: HostsService | None = None
@@ -91,6 +106,7 @@ async def list_sources(session: dict = Depends(verify_session)):
 async def add_source(
     body: HostsSourceIn,
     session: dict = Depends(verify_session),
+    _csrf: None = Depends(verify_csrf_token),
 ):
     """新增 Hosts 源"""
     svc = get_hosts_service()
@@ -111,6 +127,7 @@ async def update_source(
     source_id: str,
     body: HostsSourceUpdateIn,
     session: dict = Depends(verify_session),
+    _csrf: None = Depends(verify_csrf_token),
 ):
     """更新 Hosts 源"""
     svc = get_hosts_service()
@@ -150,6 +167,7 @@ async def get_source(
 async def delete_source(
     source_id: str,
     session: dict = Depends(verify_session),
+    _csrf: None = Depends(verify_csrf_token),
 ):
     """删除 Hosts 源"""
     svc = get_hosts_service()
@@ -186,6 +204,7 @@ async def get_content(session: dict = Depends(verify_session)):
 async def save_content(
     content: str,
     session: dict = Depends(verify_session),
+    _csrf: None = Depends(verify_csrf_token),
 ):
     """直接写入 Hosts 文件内容"""
     svc = get_hosts_service()
@@ -230,6 +249,7 @@ async def _run_hosts_pipeline(force: bool, clear_first: bool):
 async def refresh_hosts(
     force: bool = False,
     session: dict = Depends(verify_session),
+    _csrf: None = Depends(verify_csrf_token),
 ):
     """
     手动刷新 Hosts
@@ -252,6 +272,7 @@ async def refresh_hosts(
 async def rebuild_hosts(
     force: bool = True,
     session: dict = Depends(verify_session),
+    _csrf: None = Depends(verify_csrf_token),
 ):
     """先清空项目写入分区，再重新执行 Hosts 生成流程。"""
     running, running_task_id = _get_hosts_pipeline_state()
@@ -285,10 +306,24 @@ async def update_hosts_config(
     target_path: str | None = None,
     backup_enabled: bool | None = None,
     session: dict = Depends(verify_session),
+    _csrf: None = Depends(verify_csrf_token),
 ):
     """更新 Hosts 配置"""
     if target_path is not None:
-        config.set("hosts.target_path", target_path)
+        # 路径白名单校验：防止任意文件覆写
+        resolved = Path(target_path).resolve()
+        if resolved not in _ALLOWED_HOSTS_PATHS:
+            logger.warning(
+                f"拒绝非法 hosts 路径：{target_path}，操作用户：{session['username']}"
+            )
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"不允许的 hosts 文件路径：{target_path}。"
+                    "如需使用自定义路径，请通过环境变量 EXTRA_HOSTS_PATHS 配置。"
+                ),
+            )
+        config.set("hosts.target_path", str(resolved))
     if backup_enabled is not None:
         config.set("hosts.backup_enabled", backup_enabled)
     config.save()

@@ -32,7 +32,7 @@ defineEmits<{
           <i class="star-4">★</i>
         </span>
       </span>
-      <a href="https://github.com/KoWming/PT-Accelerator" target="_blank" class="github-link">
+      <a href="https://github.com/KoWming/PT-Accelerator" target="_blank" rel="noopener noreferrer" class="github-link">
         <i class="bx bxl-github"></i>
         <span>GitHub</span>
       </a>

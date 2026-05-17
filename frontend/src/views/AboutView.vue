@@ -153,7 +153,7 @@
             <div class="about-info-rows about-link-rows">
               <div class="about-info-row about-info-row-link">
                 <span class="about-info-key">原始项目</span>
-                <a href="https://github.com/eternalcurse/PT-Accelerator" target="_blank" rel="noopener" class="about-info-link-main">
+                <a href="https://github.com/eternalcurse/PT-Accelerator" target="_blank" rel="noopener noreferrer" class="about-info-link-main">
                   <i class="bx bxl-github about-link-icon" aria-hidden="true"></i>
                   <strong>eternalcurse / PT-Accelerator</strong>
                   <i class="bx bx-up-right-arrow-alt"></i>
@@ -161,7 +161,7 @@
               </div>
               <div class="about-info-row about-info-row-link">
                 <span class="about-info-key">当前项目</span>
-                <a href="https://github.com/KoWming/PT-Accelerator" target="_blank" rel="noopener" class="about-info-link-main">
+                <a href="https://github.com/KoWming/PT-Accelerator" target="_blank" rel="noopener noreferrer" class="about-info-link-main">
                   <i class="bx bxl-github about-link-icon" aria-hidden="true"></i>
                   <strong>KoWming / PT-Accelerator</strong>
                   <i class="bx bx-up-right-arrow-alt"></i>
@@ -169,7 +169,7 @@
               </div>
               <div class="about-info-row about-info-row-link">
                 <span class="about-info-key">CFST项目</span>
-                <a href="https://github.com/XIU2/CloudflareSpeedTest" target="_blank" rel="noopener" class="about-info-link-main">
+                <a href="https://github.com/XIU2/CloudflareSpeedTest" target="_blank" rel="noopener noreferrer" class="about-info-link-main">
                   <i class="bx bxl-github about-link-icon" aria-hidden="true"></i>
                   <strong>XIU2 / CloudflareSpeedTest</strong>
                   <i class="bx bx-up-right-arrow-alt"></i>

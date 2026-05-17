@@ -23,6 +23,20 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from starlette.staticfiles import StaticFiles
 
+# CORS 来源白名单（本地 SPA + Docker 端口映射场景）
+# 生产部署时，如有自定义域名，请将其追加到此列表
+_CORS_ALLOW_ORIGINS = [
+    "http://localhost:23333",
+    "http://127.0.0.1:23333",
+    "http://0.0.0.0:23333",
+]
+# 若环境变量 CORS_ORIGINS 提供了额外来源（逗号分隔），则合并
+_extra_origins = os.environ.get("CORS_ORIGINS", "")
+if _extra_origins:
+    _CORS_ALLOW_ORIGINS.extend(
+        o.strip() for o in _extra_origins.split(",") if o.strip()
+    )
+
 # 引用配置（已在 main.py 初始化）
 from app.config import config
 from app.services import scheduler_service
@@ -58,20 +72,50 @@ async def lifespan(_app: FastAPI):
 
 
 # 创建 FastAPI 实例
+# OpenAPI 文档默认关闭（生产安全）
+# 开启方式：config.yaml 中 app.debug: true，或环境变量 ENABLE_OPENAPI_DOCS=true
+_debug = config.get("app.debug", False)
+_enable_docs = _debug or os.environ.get("ENABLE_OPENAPI_DOCS", "false").lower() == "true"
+_CSP_POLICY = (
+    "default-src 'self'; "
+    "script-src 'self'; "
+    "style-src 'self' 'unsafe-inline'; "
+    "img-src 'self' data: https:; "
+    "font-src 'self' data:; "
+    "connect-src 'self' https://v1.hitokoto.cn; "
+    "frame-ancestors 'none'; "
+    "base-uri 'self'; "
+    "form-action 'self'"
+)
+
 app = FastAPI(
     title="PT-Accelerator",
     version=config.get("app.version", APP_VERSION),
-    debug=config.get("app.debug", False),
+    debug=_debug,
     lifespan=lifespan,
+    docs_url="/docs" if _enable_docs else None,
+    redoc_url="/redoc" if _enable_docs else None,
+    openapi_url="/openapi.json" if _enable_docs else None,
 )
+
+
+@app.middleware("http")
+async def add_security_headers(request, call_next):
+    response = await call_next(request)
+    response.headers["Content-Security-Policy"] = _CSP_POLICY
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=(), payment=()"
+    return response
 
 # CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_CORS_ALLOW_ORIGINS,   # ✅ 明确白名单，禁止通配符
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization", "X-Requested-With", "X-CSRF-Token"],
 )
 
 # 注册 API 路由（必须在 SPA catch-all 之前）

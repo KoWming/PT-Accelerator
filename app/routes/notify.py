@@ -3,7 +3,7 @@
 """
 from fastapi import APIRouter, Depends, HTTPException
 
-from app.auth import verify_session
+from app.auth import verify_session, verify_csrf_token
 from app.models import (
     ApiResponse,
     NotifyChannelIn,
@@ -50,6 +50,7 @@ async def get_channel_types(session: dict = Depends(verify_session)):
 async def add_channel(
     req: NotifyChannelIn,
     session: dict = Depends(verify_session),
+    _csrf: None = Depends(verify_csrf_token),
 ):
     """
     添加新的通知渠道
@@ -92,6 +93,7 @@ async def update_channel(
     channel_id: str,
     req: NotifyChannelIn,
     session: dict = Depends(verify_session),
+    _csrf: None = Depends(verify_csrf_token),
 ):
     """
     更新通知渠道
@@ -125,6 +127,7 @@ async def update_channel(
 async def delete_channel(
     channel_id: str,
     session: dict = Depends(verify_session),
+    _csrf: None = Depends(verify_csrf_token),
 ):
     """
     删除通知渠道
@@ -147,6 +150,7 @@ async def delete_channel(
 async def test_channel(
     channel_id: str,
     session: dict = Depends(verify_session),
+    _csrf: None = Depends(verify_csrf_token),
 ):
     """
     测试通知渠道

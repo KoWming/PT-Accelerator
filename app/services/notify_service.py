@@ -14,6 +14,7 @@ import httpx
 
 
 from app.utils.logger import get_logger
+from app.utils.secret_crypto import encrypt_secret, decrypt_secret
 from app.utils.notify_channels.bark import BarkChannel
 from app.utils.notify_channels.chat import ChatChannel
 from app.utils.notify_channels.dingtalk import DingTalkChannel
@@ -87,6 +88,55 @@ def _gen_id(channel_type: str, name: str) -> str:
 
 
 NOTIFY_SEPARATOR = "──────────"
+
+# 通知渠道配置中需要加密存储的敏感字段集合
+# 来源：notify-meta.json 中各渠道 fields，凡属 token/key/secret/password 类字段均列此
+NOTIFY_SECRET_FIELDS: set[str] = {
+    "QYWX_KEY",        # 企业微信机器人
+    "QYWX_AM",         # 企业微信应用（AgentID + Secret）
+    "TG_BOT_TOKEN",    # Telegram Bot Token
+    "TG_PROXY_AUTH",   # Telegram 代理认证
+    "IGOT_PUSH_KEY",   # iGot Push Key
+    "DD_BOT_TOKEN",    # 钉钉 Bot Token
+    "DD_BOT_SECRET",   # 钉钉 Bot Secret
+    "FSKEY",           # 飞书 Webhook Key
+    "SMTP_PASSWORD",   # 邮件授权码
+    "BARK_PUSH",       # Bark 设备码（含服务器地址+key）
+    "PUSH_KEY",        # Server酱 Push Key
+    "CHAT_TOKEN",      # Synology Chat Token
+    "MEDIASABER_APIKEY",  # Media Saber API Key
+    "SLACK_WEBHOOK_URL",  # Slack Webhook URL（含 token 信息）
+    "WEBHOOK_HEADERS",    # 可能含 Authorization 头
+}
+
+
+def _encrypt_notify_config(channel_type: str, raw_config: dict) -> dict:
+    """对通知渠道配置中的敏感字段进行加密，其余字段原样保留。"""
+    result = raw_config.copy()
+    for field in NOTIFY_SECRET_FIELDS:
+        value = result.get(field)
+        if isinstance(value, str) and value:
+            result[field] = encrypt_secret(value)
+    return result
+
+
+def _decrypt_notify_config(raw_config: dict) -> dict:
+    """解密通知渠道配置中的敏感字段，用于实际发送时传给 channel handler。"""
+    result = raw_config.copy()
+    for field in NOTIFY_SECRET_FIELDS:
+        value = result.get(field)
+        if isinstance(value, str) and value:
+            result[field] = decrypt_secret(value)
+    return result
+
+
+def _sanitize_notify_config(raw_config: dict) -> dict:
+    """脱敏通知渠道配置，用于 API 响应（前端展示）。"""
+    result = raw_config.copy()
+    for field in NOTIFY_SECRET_FIELDS:
+        if result.get(field):
+            result[field] = "********"
+    return result
 HITOKOTO_API_URLS = [
     "https://v1.hitokoto.cn/?encode=json",
     "https://yyapi.xpdbk.com/api/ian",
@@ -240,13 +290,25 @@ class NotifyService:
         return None
 
     def list_channels(self) -> list[dict]:
-        """列出所有通知渠道"""
-        return self._get_channels().copy()
+        """列出所有通知渠道（敏感配置字段脱敏）"""
+        channels = self._get_channels()
+        result = []
+        for ch in channels:
+            ch_copy = ch.copy()
+            if isinstance(ch_copy.get("config"), dict):
+                ch_copy["config"] = _sanitize_notify_config(ch_copy["config"])
+            result.append(ch_copy)
+        return result
 
     def get_channel(self, channel_id: str) -> Optional[dict]:
-        """根据ID获取单个渠道"""
+        """根据ID获取单个渠道（敏感配置字段脱敏）"""
         result = self._find_by_id(channel_id)
-        return result[1].copy() if result else None
+        if not result:
+            return None
+        ch = result[1].copy()
+        if isinstance(ch.get("config"), dict):
+            ch["config"] = _sanitize_notify_config(ch["config"])
+        return ch
 
     def add_channel(
         self,
@@ -283,7 +345,7 @@ class NotifyService:
             "name": name,
             "type": canonical_type,
             "enabled": enabled,
-            "config": _sanitize_config(canonical_type, config),
+            "config": _encrypt_notify_config(canonical_type, _sanitize_config(canonical_type, config)),
         }
 
         channels = self._get_channels()
@@ -333,7 +395,7 @@ class NotifyService:
             item["type"] = canonical_type
 
         if config is not None:
-            item["config"] = _sanitize_config(item.get("type", ""), config)
+            item["config"] = _encrypt_notify_config(item.get("type", ""), _sanitize_config(item.get("type", ""), config))
 
         if enabled is not None:
             item["enabled"] = enabled
@@ -411,7 +473,8 @@ class NotifyService:
     def _send_to_channel(self, channel: dict, title: str, message: str) -> bool:
         """向单个渠道发送消息"""
         channel_type = channel.get("type", "")
-        config = channel.get("config", {})
+        # 解密敏感字段后传给 channel handler
+        config = _decrypt_notify_config(channel.get("config", {}))
         channel_name = channel.get("name", channel_type)
 
         try:
@@ -445,7 +508,8 @@ class NotifyService:
 
         _, item = result
         channel_type = item["type"]
-        config = item.get("config", {})
+        # 解密敏感字段后传给 channel handler
+        config = _decrypt_notify_config(item.get("config", {}))
 
         try:
             handler = self._build_channel_instance(channel_type, config)

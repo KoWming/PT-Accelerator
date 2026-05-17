@@ -71,7 +71,7 @@
                 <div class="settings-field-card">
                   <label class="form-label settings-form-label">{{ authInitialized ? '新密码' : '初始密码' }}</label>
                   <input type="password" class="form-control settings-standalone-input" :value="authForm.new_password" :placeholder="authInitialized ? '请输入新密码' : '请输入初始化密码'" @input="updateField('new_password', ($event.target as HTMLInputElement).value)">
-                  <div class="settings-field-hint">密码要求：至少 4 位字符；建议包含大小写字母、数字和特殊字符。</div>
+                  <div class="settings-field-hint">密码要求：至少 8 位，且必须同时包含字母和数字。</div>
                 </div>
                 <div class="settings-field-card">
                   <label class="form-label settings-form-label">确认{{ authInitialized ? '新密码' : '初始密码' }}</label>

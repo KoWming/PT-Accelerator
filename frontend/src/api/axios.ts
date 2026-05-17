@@ -1,8 +1,81 @@
-import axios, { type AxiosInstance } from 'axios';
+import axios, { AxiosHeaders, type AxiosInstance, type InternalAxiosRequestConfig } from 'axios';
+
+const CSRF_SAFE_METHODS = new Set(['get', 'head', 'options']);
+let csrfTokenRequest: Promise<string> | null = null;
 
 const shouldRedirectToLogin = (error: any) => {
     const requestUrl = String(error?.config?.url || '');
     return !requestUrl.includes('/auth/login');
+};
+
+const getCookieValue = (name: string) => {
+    if (typeof document === 'undefined') {
+        return '';
+    }
+
+    const cookie = document.cookie
+        .split('; ')
+        .find((item) => item.startsWith(`${name}=`));
+
+    if (!cookie) {
+        return '';
+    }
+
+    const value = cookie.slice(name.length + 1);
+    return decodeURIComponent(value);
+};
+
+const readCsrfToken = () => getCookieValue('csrf_token');
+
+const fetchCsrfToken = async () => {
+    await axios.get('/api/auth/csrf', {
+        withCredentials: true,
+        headers: {
+            'Accept': 'application/json',
+        },
+        timeout: 30000,
+    });
+
+    return readCsrfToken();
+};
+
+const ensureCsrfToken = async () => {
+    const existingToken = readCsrfToken();
+    if (existingToken) {
+        return existingToken;
+    }
+
+    if (!csrfTokenRequest) {
+        csrfTokenRequest = fetchCsrfToken().finally(() => {
+            csrfTokenRequest = null;
+        });
+    }
+
+    return csrfTokenRequest;
+};
+
+const attachCsrfInterceptor = (instance: AxiosInstance) => {
+    instance.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
+        const method = String(config.method || 'get').toLowerCase();
+        if (CSRF_SAFE_METHODS.has(method)) {
+            return config;
+        }
+
+        const token = await ensureCsrfToken();
+        if (!token) {
+            return config;
+        }
+
+        if (config.headers instanceof AxiosHeaders) {
+            config.headers.set('X-CSRF-Token', token);
+        } else {
+            const headers = AxiosHeaders.from(config.headers);
+            headers.set('X-CSRF-Token', token);
+            config.headers = headers;
+        }
+
+        return config;
+    });
 };
 
 // Axios 实例 - 所有 API 统一使用 /api 前缀
@@ -14,6 +87,8 @@ const api: AxiosInstance = axios.create({
     withCredentials: true,  // 启用 Cookie
     timeout: 30000,
 });
+
+attachCsrfInterceptor(api);
 
 // 响应拦截：处理 ApiResponse 格式和错误
 api.interceptors.response.use(
@@ -56,6 +131,8 @@ export const authApi: AxiosInstance = axios.create({
     timeout: 30000,
 });
 
+attachCsrfInterceptor(authApi);
+
 authApi.interceptors.response.use(
     (response) => response,
     (error) => {
@@ -67,4 +144,3 @@ authApi.interceptors.response.use(
 );
 
 export default api;
-

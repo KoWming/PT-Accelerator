@@ -1,6 +1,7 @@
 import { settings } from '@/api';
 import type { Ref } from 'vue';
 import type { AuthFormState, PageFeedback, SettingPageKey } from '@/types/settings';
+import { getErrorMessage } from '@/utils/error';
 
 interface UseSettingsAuthActionsOptions {
   authInitialized: Ref<boolean>;
@@ -90,7 +91,7 @@ export const useSettingsAuthActions = ({
       authForm.new_password = '';
       authForm.confirm_password = '';
     } catch (e: any) {
-      const message = e.response?.data?.detail || e.message;
+      const message = getErrorMessage(e, '保存失败');
       setPageStatusBanner('安全与认证保存失败', message, 'error');
       toast.error('保存失败: ' + message);
     } finally {

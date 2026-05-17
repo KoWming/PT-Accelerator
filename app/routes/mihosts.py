@@ -1,8 +1,9 @@
 """
 小米路由器 Hosts 路由
 """
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
+from app.auth import verify_session, verify_csrf_token
 from app.config import config
 from app.services.mihosts_service import MiHostsService
 from app.services.cfst_service import cfst_service
@@ -30,7 +31,7 @@ def _get_service() -> MiHostsService | None:
 
 
 @router.get("/status")
-def get_status():
+def get_status(session: dict = Depends(verify_session)):
     """
     获取小米路由器配置状态
     """
@@ -47,7 +48,7 @@ def get_status():
 
 
 @router.post("/test")
-def test_connection(body: dict | None = None):
+def test_connection(body: dict | None = None, session: dict = Depends(verify_session), _csrf: None = Depends(verify_csrf_token)):
     """
     测试小米路由器连接
     """
@@ -85,7 +86,7 @@ def test_connection(body: dict | None = None):
 
 
 @router.get("/remote-hosts")
-def get_remote_hosts():
+def get_remote_hosts(session: dict = Depends(verify_session)):
     """
     获取小米路由器当前 hosts 内容
     """
@@ -104,7 +105,7 @@ def get_remote_hosts():
 
 
 @router.post("/sync")
-def sync_hosts():
+def sync_hosts(session: dict = Depends(verify_session), _csrf: None = Depends(verify_csrf_token)):
     """
     将 CFST 缓存结果同步到小米路由器 hosts
 

@@ -2,6 +2,7 @@
 下载器客户端服务
 
 下载器配置存储在 config.downloaders.items。
+密码与 apikey 使用 AES-128-GCM 加密后存储（enc:<base64url> 格式）。
 """
 import hashlib
 import re as re_module
@@ -9,6 +10,7 @@ from typing import Optional
 from urllib.parse import urlparse
 
 from app.utils.logger import get_logger
+from app.utils.secret_crypto import decrypt_secret, encrypt_secret
 
 
 logger = get_logger(__name__)
@@ -202,9 +204,22 @@ class ClientsService:
                 return i, item
         return None
 
+    @staticmethod
+    def _sanitize_for_response(item: dict) -> dict:
+        """
+        脱敏处理：将 password / apikey 密文替换为固定掩码，防止前端收到 enc:xxx 密文。
+        不影响服务内部使用的原始 item。
+        """
+        out = item.copy()
+        if out.get("password"):
+            out["password"] = "********"
+        if out.get("apikey"):
+            out["apikey"] = "********"
+        return out
+
     def list_clients(self) -> list[dict]:
-        """列出所有下载器客户端"""
-        return self._get_items().copy()
+        """列出所有下载器客户端（密码/apikey 脱敏）"""
+        return [self._sanitize_for_response(c) for c in self._get_items()]
 
     def get_supported_types(self) -> list[dict]:
         """获取支持的客户端类型列表。"""
@@ -215,9 +230,9 @@ class ClientsService:
         return [c for c in self._get_items() if c.get("enabled", True)]
 
     def get_client(self, client_id: str) -> Optional[dict]:
-        """根据ID获取单个客户端"""
+        """根据ID获取单个客户端（密码/apikey 脱敏）"""
         result = self._find_by_id(client_id)
-        return result[1].copy() if result else None
+        return self._sanitize_for_response(result[1]) if result else None
 
     def add_client(
         self,
@@ -249,8 +264,8 @@ class ClientsService:
                 host=host_for_save,
                 port=port_for_save,
                 username=username,
-                password=password,
-                apikey=apikey or item.get("apikey", ""),
+                password=encrypt_secret(password),
+                apikey=encrypt_secret(apikey or item.get("apikey", "")),
                 version=version or item.get("version"),
             )
             items[idx] = updated_item
@@ -267,8 +282,8 @@ class ClientsService:
             host=host_for_save,
             port=port_for_save,
             username=username,
-            password=password,
-            apikey=apikey,
+            password=encrypt_secret(password),
+            apikey=encrypt_secret(apikey),
             version=version,
         )
 
@@ -322,8 +337,8 @@ class ClientsService:
             host=next_host,
             port=next_port,
             username=str(next_username),
-            password=str(next_password),
-            apikey=str(next_apikey),
+            password=encrypt_secret(str(next_password)),
+            apikey=encrypt_secret(str(next_apikey)),
             version=str(next_version) if next_version else None,
         )
 
@@ -363,8 +378,8 @@ class ClientsService:
                 host=item["host"],
                 port=item["port"],
                 username=item.get("username", ""),
-                password=item.get("password", ""),
-                apikey=item.get("apikey", ""),
+                password=decrypt_secret(item.get("password", "")),
+                apikey=decrypt_secret(item.get("apikey", "")),
             )
             connected = client.ping()
             if connected:
@@ -378,8 +393,8 @@ class ClientsService:
                     host=item["host"],
                     port=item["port"],
                     username=item.get("username", ""),
-                    password=item.get("password", ""),
-                    apikey=item.get("apikey", ""),
+                    password=item.get("password", ""),  # 保持已加密的密文不变
+                    apikey=item.get("apikey", ""),       # 保持已加密的密文不变
                     version=version,
                 )
                 self._save_items(items)
@@ -457,7 +472,7 @@ class ClientsService:
                     host=item["host"],
                     port=item["port"],
                     username=item.get("username", ""),
-                    password=item.get("password", ""),
+                    password=decrypt_secret(item.get("password", "")),
                 )
                 urls = client.get_trackers()
                 normalized_targets = {

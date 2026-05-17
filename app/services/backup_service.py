@@ -16,6 +16,7 @@ from urllib.parse import unquote, urlparse
 import xml.etree.ElementTree as ET
 
 from app.utils.logger import get_logger
+from app.utils.secret_crypto import encrypt_secret, decrypt_secret
 
 logger = get_logger(__name__)
 
@@ -122,7 +123,7 @@ class BackupService:
 
         webdav_url = (cfg.get("webdav_url") or "").strip().rstrip("/")
         webdav_user = cfg.get("webdav_username", "")
-        webdav_pass = cfg.get("webdav_password", "")
+        webdav_pass = decrypt_secret(cfg.get("webdav_password", ""))  # 解密
         webdav_path = (cfg.get("webdav_path") or "/backups").strip() or "/backups"
         auth = (webdav_user, webdav_pass) if webdav_user else None
 
@@ -240,7 +241,7 @@ class BackupService:
         if webdav_username is not None:
             cfg["webdav_username"] = webdav_username
         if webdav_password is not None and webdav_password != "":
-            cfg["webdav_password"] = webdav_password
+            cfg["webdav_password"] = encrypt_secret(webdav_password)  # 加密后存储
         if webdav_path is not None and webdav_path != "":
             cfg["webdav_path"] = webdav_path.strip()
         if local_keep_count is not None:
@@ -360,7 +361,7 @@ class BackupService:
 
         webdav_url = cfg.get("webdav_url", "")
         webdav_user = cfg.get("webdav_username", "")
-        webdav_pass = cfg.get("webdav_password", "")
+        webdav_pass = decrypt_secret(cfg.get("webdav_password", ""))  # 解密
         webdav_path = cfg.get("webdav_path", "/backups")
 
         if not webdav_url:
@@ -417,7 +418,7 @@ class BackupService:
         cfg = self._get_config()
         webdav_url = cfg.get("webdav_url", "")
         webdav_user = cfg.get("webdav_username", "")
-        webdav_pass = cfg.get("webdav_password", "")
+        webdav_pass = decrypt_secret(cfg.get("webdav_password", ""))  # 解密
         webdav_path = cfg.get("webdav_path", "/backups")
 
         if not webdav_url:
@@ -441,6 +442,24 @@ class BackupService:
 
         return str(temp_path)
 
+    @staticmethod
+    def _is_safe_zip_member(member_name: str, extract_dir: str) -> bool:
+        """
+        校验 ZIP 成员路径是否安全（防御 Zip Slip 路径遍历攻击）。
+
+        规则：
+          1. 拒绝空文件名
+          2. 拒绝包含 '..' 的路径组件
+          3. 解析后的绝对路径必须以 extract_dir 为前缀
+        """
+        if not member_name:
+            return False
+
+        # 规范化路径，转为绝对路径
+        safe_base = os.path.realpath(extract_dir)
+        target = os.path.realpath(os.path.join(extract_dir, member_name))
+        return target.startswith(safe_base + os.sep) or target == safe_base
+
     def _restore_zip(self, zip_path: str) -> dict:
         extract_dir = "config/restore_temp"
         if os.path.exists(extract_dir):
@@ -448,7 +467,12 @@ class BackupService:
         os.makedirs(extract_dir, exist_ok=True)
 
         with zipfile.ZipFile(zip_path, "r") as zf:
-            zf.extractall(extract_dir)
+            # 安全解压：逐成员校验路径，拒绝 Zip Slip 攻击
+            for member in zf.infolist():
+                if not self._is_safe_zip_member(member.filename, extract_dir):
+                    logger.warning(f"备份恢复：跳过不安全的 ZIP 成员路径：{member.filename!r}")
+                    continue
+                zf.extract(member, extract_dir)
 
         for root, _, files in os.walk(extract_dir):
             for fname in files:
@@ -498,7 +522,7 @@ class BackupService:
             cfg = self._get_config()
             webdav_url = (cfg.get("webdav_url") or "").strip().rstrip("/")
             webdav_user = cfg.get("webdav_username", "")
-            webdav_pass = cfg.get("webdav_password", "")
+            webdav_pass = decrypt_secret(cfg.get("webdav_password", ""))  # 修复：解密后再使用
             webdav_path = (cfg.get("webdav_path") or "/backups").strip() or "/backups"
             file_name = backup.get("file", "")
 

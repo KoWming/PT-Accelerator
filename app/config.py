@@ -266,6 +266,11 @@ DEFAULT_CONFIG: dict = {
     "auth": {
         "username": "admin",
         "password_hash": "",
+        "password_salt": "",
+        "initialized": False,
+        "initialized_at": "",
+        "reset_key_hash": "",
+        "reset_token_hash": "",
     },
     "cfst": {
         "threads": 200,
