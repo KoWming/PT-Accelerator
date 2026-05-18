@@ -412,16 +412,20 @@ def _migrate_v1_to_v2(data: dict) -> dict:
                 if isinstance(v, str):
                     item[field] = _enc(v)
 
-    # --- notify.channels[*] 敏感字段 ---
+    # --- notify.channels[*] 敏感字段（存于 config 嵌套对象内）---
     channels = data.get("notify", {}).get("channels", [])
     if isinstance(channels, list):
         for ch in channels:
             if not isinstance(ch, dict):
                 continue
+            # 敏感字段存储在 config 嵌套对象里，而非顶层
+            inner_config = ch.get("config")
+            if not isinstance(inner_config, dict):
+                continue
             for field in NOTIFY_SECRET_FIELDS:
-                v = ch.get(field, "")
+                v = inner_config.get(field, "")
                 if isinstance(v, str):
-                    ch[field] = _enc(v)
+                    inner_config[field] = _enc(v)
 
     logger.info("配置迁移 v1→v2 完成：敏感字段已加密")
     return data
