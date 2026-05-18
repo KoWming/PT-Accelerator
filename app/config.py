@@ -29,7 +29,7 @@ SCHEMA_VERSION_PATH = os.path.join(CONFIG_DIR, ".schema_version")
 LOCK_FILE = CONFIG_PATH + ".lock"
 
 # 当前 schema 版本
-CURRENT_SCHEMA_VERSION = 1
+CURRENT_SCHEMA_VERSION = 2
 
 WINDOWS_HOSTS_PATH = "C:\\Windows\\System32\\drivers\\etc\\hosts"
 LINUX_HOSTS_PATH = "/etc/hosts"
@@ -354,14 +354,85 @@ DEFAULT_CONFIG: dict = {
 
 
 # ==================== 配置迁移 ====================
+
+def _migrate_v1_to_v2(data: dict) -> dict:
+    """
+    schema v1 → v2：对配置文件中所有明文敏感字段进行一次性 AES-GCM 加密迁移。
+
+    涵盖字段：
+    - ikuai.password
+    - backup.webdav_password
+    - downloaders.items[*].password / apikey
+    - notify.channels[*] 中 NOTIFY_SECRET_FIELDS 定义的所有字段
+
+    加密前提：字段非空且不以 "enc:" 开头（即尚未加密）。
+    若 encrypt_secret 因缺少依赖或其他原因失败，记录警告并保留原值（宁可留明文也不破坏配置）。
+    """
+    # 延迟导入，避免模块加载顺序问题
+    from app.utils.secret_crypto import encrypt_secret
+
+    # 导入通知渠道敏感字段集合（单一来源，保持与 notify_service.py 同步）
+    try:
+        from app.services.notify_service import NOTIFY_SECRET_FIELDS
+    except Exception:
+        NOTIFY_SECRET_FIELDS = set()
+
+    def _enc(value: str) -> str:
+        """对单个明文值加密；失败时记录警告并返回原值。"""
+        if not value or value.startswith("enc:"):
+            return value
+        try:
+            return encrypt_secret(value)
+        except Exception as exc:
+            logger.warning(f"[migration v1→v2] 加密失败，保留原值：{exc}")
+            return value
+
+    # --- ikuai.password ---
+    ikuai = data.get("ikuai")
+    if isinstance(ikuai, dict):
+        pw = ikuai.get("password", "")
+        if isinstance(pw, str):
+            ikuai["password"] = _enc(pw)
+
+    # --- backup.webdav_password ---
+    backup = data.get("backup")
+    if isinstance(backup, dict):
+        pw = backup.get("webdav_password", "")
+        if isinstance(pw, str):
+            backup["webdav_password"] = _enc(pw)
+
+    # --- downloaders.items[*].password / apikey ---
+    items = data.get("downloaders", {}).get("items", [])
+    if isinstance(items, list):
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            for field in ("password", "apikey"):
+                v = item.get(field, "")
+                if isinstance(v, str):
+                    item[field] = _enc(v)
+
+    # --- notify.channels[*] 敏感字段 ---
+    channels = data.get("notify", {}).get("channels", [])
+    if isinstance(channels, list):
+        for ch in channels:
+            if not isinstance(ch, dict):
+                continue
+            for field in NOTIFY_SECRET_FIELDS:
+                v = ch.get(field, "")
+                if isinstance(v, str):
+                    ch[field] = _enc(v)
+
+    logger.info("配置迁移 v1→v2 完成：敏感字段已加密")
+    return data
+
+
 class ConfigMigration:
     """配置 schema 迁移器"""
 
     # 迁移函数字典：{from_version: function_to_upgrade_to_next}
     MIGRATIONS: dict[int, Callable[[dict], dict]] = {
-        # 示例：
-        # 1: lambda cfg: {...},  # v1 -> v2
-        # 2: lambda cfg: {...},  # v2 -> v3
+        1: _migrate_v1_to_v2,  # v1 -> v2：明文敏感字段 AES-GCM 加密迁移
     }
 
     @classmethod
@@ -407,13 +478,13 @@ class ConfigManager:
         self._data: dict = {}
         self._loaded = False
 
-    def load(self) -> dict:
+    def load(self) -> tuple[dict, bool]:
         """
         加载配置（线程安全）
         1. 读取 YAML 文件
         2. 合并默认配置
         3. 执行迁移
-        4. 返回合并后的配置
+        4. 返回 (合并后的配置, 是否发生了 schema 迁移)
         """
         with self._lock:
             if os.path.exists(self._path):
@@ -431,8 +502,13 @@ class ConfigManager:
             # 合并默认配置（loaded 优先级更高）
             self._data = self._merge_defaults(loaded)
 
+            # 记录迁移前版本，用于判断是否发生了迁移
+            version_before = self._data.get("schema_version", 1)
+
             # 执行迁移
             self._data = ConfigMigration.migrate(self._data)
+
+            migrated = self._data.get("schema_version", 1) != version_before
 
             # 统一 downloaders.items 结构
             self._data = _normalize_downloaders_config(self._data)
@@ -445,7 +521,7 @@ class ConfigManager:
 
             self._loaded = True
 
-            return self._data.copy()
+            return self._data.copy(), migrated
 
 
 
@@ -521,12 +597,19 @@ class Config:
     def init(self):
         """初始化配置（在 main.py 中调用一次）"""
         logger.info("正在初始化配置...")
-        self._data = self._manager.load()
+        self._data, migrated = self._manager.load()
         current_version = str(self._data.get("app", {}).get("version") or "").strip()
+
+        needs_save = migrated  # schema 迁移发生时必须落盘
+
         if current_version != APP_VERSION:
             self.set("app.version", APP_VERSION)
-            self.save()
+            needs_save = True
             logger.info(f"配置中的应用版本已同步：{current_version or '未设置'} -> {APP_VERSION}")
+
+        if needs_save:
+            self.save()
+
         logger.info(f"配置初始化完成，schema v{self._data.get('schema_version')}")
 
     def get(self, key: str, default: Any = None) -> Any:
@@ -588,7 +671,7 @@ class Config:
 
     def reload(self):
         """从文件重新加载配置"""
-        self._data = self._manager.load()
+        self._data, _ = self._manager.load()
 
 
 # 全局单例

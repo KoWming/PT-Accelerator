@@ -407,9 +407,18 @@ docker build -t pt-accelerator:new .
 
 ## 🏷️ 版本信息
 
-当前项目版本：`3.0.5`
+当前项目版本：`3.0.6`
 
 ### 更新日志
+
+#### v3.0.6 (2026-05-18)
+
+**🔐 配置文件敏感字段加密迁移**
+- 新增配置 schema 版本管理（v1 → v2），首次启动时自动将旧配置中的明文敏感字段加密为 `enc:` 格式
+- 覆盖加密字段：`ikuai.password`、`backup.webdav_password`、`downloaders.items[*].password/apikey`、以及 `notify.channels` 中全部 16 类敏感配置
+- 加密采用 AES-GCM 体系，密钥派生自自动生成的 `.secret_key` 文件（首次加密时自动创建）
+- 迁移过程幂等安全：已加密字段（`enc:` 前缀）不再重复加密；加密失败时保留原值并记录警告，不破坏配置文件
+- 迁移完成后自动将 `schema_version` 更新为 2，后续启动不再重复执行迁移
 
 #### v3.0.5 (2026-05-17)
 

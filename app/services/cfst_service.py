@@ -132,9 +132,6 @@ class CfstService:
         return (binary_path.parent / "result.csv").resolve()
 
 
-
-
-
     @staticmethod
     def _to_log_path(path: Path) -> str:
         """日志中尽量显示相对工作区路径，读起来更短。"""
@@ -167,7 +164,6 @@ class CfstService:
             "threads": 200,
             "ping_times": 4,
             "download_count": 20,
-
             "download_time": 10,
             "tcp_port": 443,
             "min_delay": 0,
@@ -217,10 +213,6 @@ class CfstService:
         return cmd
 
 
-
-
-
-
     @staticmethod
     def _row_value(row: dict, *keys: str) -> str:
         for key in keys:
@@ -251,28 +243,31 @@ class CfstService:
         if not csv_path.exists():
             return []
 
-        with csv_path.open("r", encoding="utf-8-sig", newline="") as f:
-            reader = csv.DictReader(f)
-            parsed_results: list[dict] = []
-            for row in reader:
-                parsed_results.append(
-                    {
-                        "ip": self._row_value(row, "IP 地址", "IP", "ip"),
-                        "sent": self._to_int(self._row_value(row, "已发送", "发送", "send", "sent")),
-                        "received": self._to_int(self._row_value(row, "已接收", "接收", "recv", "received")),
-                        "loss_rate": self._to_float(
-                            self._row_value(row, "丢包率(%)", "丢包率", "loss", "loss_rate")
-                        ),
-                        "avg_latency": self._to_float(
-                            self._row_value(row, "平均延迟(ms)", "平均延迟", "latency", "delay")
-                        ),
-                        "download_speed": self._to_float(
-                            self._row_value(row, "下载速度(MB/s)", "下载速度", "speed", "download_speed")
-                        ),
-                        "location": self._row_value(row, "地区码(Colo)", "地区码", "colo", "location"),
-                        "timestamp": datetime.now().isoformat(),
-                    }
-                )
+        try:
+            with csv_path.open("r", encoding="utf-8-sig", newline="") as f:
+                reader = csv.DictReader(f)
+                parsed_results: list[dict] = []
+                for row in reader:
+                    parsed_results.append(
+                        {
+                            "ip": self._row_value(row, "IP 地址", "IP", "ip"),
+                            "sent": self._to_int(self._row_value(row, "已发送", "发送", "send", "sent")),
+                            "received": self._to_int(self._row_value(row, "已接收", "接收", "recv", "received")),
+                            "loss_rate": self._to_float(
+                                self._row_value(row, "丢包率(%)", "丢包率", "loss", "loss_rate")
+                            ),
+                            "avg_latency": self._to_float(
+                                self._row_value(row, "平均延迟(ms)", "平均延迟", "latency", "delay")
+                            ),
+                            "download_speed": self._to_float(
+                                self._row_value(row, "下载速度(MB/s)", "下载速度", "speed", "download_speed")
+                            ),
+                            "location": self._row_value(row, "地区码(Colo)", "地区码", "colo", "location"),
+                            "timestamp": datetime.now().isoformat(),
+                        }
+                    )
+        except FileNotFoundError:
+            return []
 
         return parsed_results
 
@@ -411,9 +406,6 @@ class CfstService:
             logger.info(f"CFST 输入文件：{self._to_log_path(self._get_default_ip_file(binary_path))}")
             logger.info(f"CFST 结果文件：{self._to_log_path(result_file)}")
             logger.info(f"开始执行 CFST：{self._command_for_log(cmd)}")
-
-
-
             timeout_seconds = max(int(runtime_config.get("timeout_seconds", 300) or 300), 30)
             process = subprocess.Popen(
                 cmd,
@@ -572,16 +564,18 @@ class CfstService:
     def get_status(self) -> dict:
         result_file = self.csv_results_file
         with self._lock:
+            running = self._running
+            result_count = len(self._results) if self._results else 0
+            if not running and result_count == 0:
+                result_count = len(self.parse_result_csv(result_file))
             return {
-                "running": self._running,
+                "running": running,
                 "task_id": self._task_id,
                 "progress": self._progress,
                 "started_at": self._started_at,
-                "result_count": len(self._results) if self._results else len(self.parse_result_csv(result_file)),
+                "result_count": result_count,
                 "message": self._status_message,
             }
-
-
 
 
 cfst_service = CfstService()
