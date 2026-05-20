@@ -131,6 +131,7 @@ async def update_source(
 ):
     """更新 Hosts 源"""
     svc = get_hosts_service()
+    old_source = svc.get_source(source_id)
     try:
         updated = svc.update_source(
             source_id=source_id,
@@ -140,6 +141,29 @@ async def update_source(
         )
         if updated is None:
             raise HTTPException(status_code=404, detail=f"源不存在: {source_id}")
+
+        # 如果启用状态或 URL 发生了变化，触发后台清空重建任务
+        if old_source:
+            old_enabled = old_source.get("enabled", True)
+            old_url = old_source.get("url", "")
+            new_enabled = updated.get("enabled", True)
+            new_url = updated.get("url", "")
+
+            if old_enabled != new_enabled or old_url != new_url:
+                running, _ = _get_hosts_pipeline_state()
+                if not running:
+                    task_id = uuid.uuid4().hex[:8]
+                    _set_hosts_pipeline_state(True, task_id)
+                    _start_hosts_pipeline_background(
+                        task_id,
+                        force=True,
+                        clear_first=True,
+                        username=session["username"]
+                    )
+                    logger.info(f"Hosts 源更新，触发后台清空重建任务：task_id={task_id}")
+                else:
+                    logger.warning("Hosts 后台刷新任务正在运行，跳过自动清空重建")
+
         return ApiResponse(
             data=HostsSourceUpdateOut().model_dump()
         ).model_dump()
@@ -174,6 +198,22 @@ async def delete_source(
     deleted = svc.delete_source(source_id)
     if not deleted:
         raise HTTPException(status_code=404, detail=f"源不存在: {source_id}")
+
+    # 触发后台清空重建任务
+    running, _ = _get_hosts_pipeline_state()
+    if not running:
+        task_id = uuid.uuid4().hex[:8]
+        _set_hosts_pipeline_state(True, task_id)
+        _start_hosts_pipeline_background(
+            task_id,
+            force=True,
+            clear_first=True,
+            username=session["username"]
+        )
+        logger.info(f"Hosts 源被删除，触发后台清空重建任务：task_id={task_id}")
+    else:
+        logger.warning("Hosts 后台刷新任务正在运行，跳过自动清空重建")
+
     return ApiResponse(
         data=HostsSourceDeleteOut().model_dump()
     ).model_dump()

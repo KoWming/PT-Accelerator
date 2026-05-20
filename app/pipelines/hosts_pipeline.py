@@ -93,19 +93,34 @@ class HostsPipeline:
             managed_candidates: dict[str, set[str]] = {}
             enabled_sources = [source for source in sources if source.get("enabled", True)]
             source_fetch_success_count = 0
+
+            active_domains = set()
+            cached_source_domains = self._hosts.load_source_domains()
+
             for source in enabled_sources:
-                source_name = source.get("name") or source.get("id") or source.get("url", "未知源")
+                source_id = source.get("id")
+                source_name = source.get("name") or source_id or source.get("url", "未知源")
                 source_url = source.get("url", "")
                 try:
                     content = await self._hosts.fetch_source(source_url)
                     parsed = self._hosts.parse_hosts_candidates(content)
                     managed_candidates = self._hosts.add_candidates(managed_candidates, parsed)
 
+                    # 记录并保存该源本次成功拉取的所有域名
+                    fetched_domains = list(parsed.keys())
+                    active_domains.update(fetched_domains)
+                    if source_id:
+                        self._hosts.save_source_domains(source_id, fetched_domains)
+
                     source_fetch_success_count += 1
                 except Exception as e:
                     error_message = f"Hosts 源拉取失败：{source_name}（{source_url}） - {type(e).__name__}: {e}"
                     result["errors"].append(error_message)
                     logger.warning(error_message, exc_info=True)
+
+                    # 拉取失败时，如果本地有该源的历史缓存域名，则加载作为活跃域名参与历史兜底
+                    if source_id and source_id in cached_source_domains:
+                        active_domains.update(cached_source_domains[source_id])
 
             # Step 2: 单独整理 CF Tracker 映射（tracker URL → hostname 作为域名）
             cf_hosts: list[dict] = []
@@ -139,10 +154,11 @@ class HostsPipeline:
                 if detail.get("strategy") == "fallback_first_candidate"
             ])
 
-            # Step 4: 用当前 Managed Hosts / 最近成功历史补回本轮缺失域名
+            # Step 4: 用当前 Managed Hosts / 最近成功历史补回本轮缺失域名（过滤已关闭或已删除源的域名）
             managed_mapping, history_fallback_details = self._hosts.apply_history_fallback(
                 managed_mapping,
                 excluded_domains=set(cf_mapping.keys()),
+                active_domains=active_domains,
             )
 
             result["history_fallback_count"] = len(history_fallback_details)

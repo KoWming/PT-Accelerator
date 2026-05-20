@@ -94,6 +94,7 @@ NOTIFY_SEPARATOR = "──────────"
 NOTIFY_SECRET_FIELDS: set[str] = {
     "QYWX_KEY",        # 企业微信机器人
     "QYWX_AM",         # 企业微信应用（AgentID + Secret）
+    "QYWX_ORIGIN",     # 企业微信应用转发代理地址
     "TG_BOT_TOKEN",    # Telegram Bot Token
     "TG_PROXY_AUTH",   # Telegram 代理认证
     "IGOT_PUSH_KEY",   # iGot Push Key
@@ -110,13 +111,40 @@ NOTIFY_SECRET_FIELDS: set[str] = {
 }
 
 
-def _encrypt_notify_config(channel_type: str, raw_config: dict) -> dict:
+def _encrypt_notify_config(channel_type: str, raw_config: dict, old_config: dict = None) -> dict:
     """对通知渠道配置中的敏感字段进行加密，其余字段原样保留。"""
     result = raw_config.copy()
+    old_config = old_config or {}
     for field in NOTIFY_SECRET_FIELDS:
         value = result.get(field)
         if isinstance(value, str) and value:
-            result[field] = encrypt_secret(value)
+            if value == "********":
+                if old_config.get(field):
+                    result[field] = old_config[field]
+            elif field == "QYWX_AM" and "********" in value:
+                old_val = old_config.get("QYWX_AM")
+                if old_val:
+                    try:
+                        old_decrypted = decrypt_secret(old_val)
+                        old_parts = old_decrypted.split(",")
+                        new_parts = value.split(",")
+                        merged_parts = []
+                        for i, part in enumerate(new_parts):
+                            if part == "********":
+                                if i < len(old_parts):
+                                    merged_parts.append(old_parts[i])
+                                else:
+                                    merged_parts.append("")
+                            else:
+                                merged_parts.append(part)
+                        merged_str = ",".join(merged_parts)
+                        result[field] = encrypt_secret(merged_str)
+                    except Exception:
+                        result[field] = old_val
+                else:
+                    result[field] = encrypt_secret(value)
+            else:
+                result[field] = encrypt_secret(value)
     return result
 
 
@@ -134,8 +162,28 @@ def _sanitize_notify_config(raw_config: dict) -> dict:
     """脱敏通知渠道配置，用于 API 响应（前端展示）。"""
     result = raw_config.copy()
     for field in NOTIFY_SECRET_FIELDS:
-        if result.get(field):
-            result[field] = "********"
+        val = result.get(field)
+        if val:
+            if field == "QYWX_AM":
+                try:
+                    decrypted = decrypt_secret(val)
+                    parts = decrypted.split(",")
+                    if len(parts) >= 4:
+                        masked_parts = [
+                            "********",  # corpid
+                            "********",  # corpsecret
+                            parts[2],    # touser
+                            "********",  # agentid
+                        ]
+                        if len(parts) > 4:
+                            masked_parts.append(parts[4])
+                        result[field] = ",".join(masked_parts)
+                    else:
+                        result[field] = "********"
+                except Exception:
+                    result[field] = "********"
+            else:
+                result[field] = "********"
     return result
 HITOKOTO_API_URLS = [
     "https://v1.hitokoto.cn/?encode=json",
@@ -395,7 +443,11 @@ class NotifyService:
             item["type"] = canonical_type
 
         if config is not None:
-            item["config"] = _encrypt_notify_config(item.get("type", ""), _sanitize_config(item.get("type", ""), config))
+            item["config"] = _encrypt_notify_config(
+                item.get("type", ""),
+                _sanitize_config(item.get("type", ""), config),
+                old_config=item.get("config", {})
+            )
 
         if enabled is not None:
             item["enabled"] = enabled

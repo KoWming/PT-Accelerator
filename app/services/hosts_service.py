@@ -132,6 +132,7 @@ class HostsService:
         config.set("hosts.sources", sources)
         config.save()
         logger.info(f"Hosts 源已删除：{source_id}")
+        self.delete_source_domains_cache(source_id)
         return True
 
     # ==================== 内容操作 ====================
@@ -331,6 +332,50 @@ class HostsService:
                 return normalized
         return {}
 
+    def load_source_domains(self) -> dict[str, list[str]]:
+        """读取源 ID 到域名列表的缓存映射"""
+        if HOSTS_HISTORY_PATH.exists():
+            try:
+                with HOSTS_HISTORY_PATH.open("r", encoding="utf-8") as f:
+                    loaded = yaml.safe_load(f) or {}
+                return loaded.get("source_domains", {})
+            except Exception as e:
+                logger.warning(f"读取 Hosts 历史中的源域名映射失败：{e}")
+        return {}
+
+    def save_source_domains(self, source_id: str, domains: list[str]):
+        """持久化单个源的域名列表缓存"""
+        try:
+            loaded = {}
+            if HOSTS_HISTORY_PATH.exists():
+                with HOSTS_HISTORY_PATH.open("r", encoding="utf-8") as f:
+                    loaded = yaml.safe_load(f) or {}
+            
+            source_domains = loaded.setdefault("source_domains", {})
+            source_domains[source_id] = sorted(list(set(domains)))
+            
+            HOSTS_HISTORY_PATH.parent.mkdir(parents=True, exist_ok=True)
+            with HOSTS_HISTORY_PATH.open("w", encoding="utf-8") as f:
+                yaml.safe_dump(loaded, f, allow_unicode=True, default_flow_style=False, sort_keys=False)
+        except Exception as e:
+            logger.warning(f"保存 Hosts 源域名缓存失败：{e}")
+
+    def delete_source_domains_cache(self, source_id: str):
+        """删除指定源的域名缓存"""
+        try:
+            if not HOSTS_HISTORY_PATH.exists():
+                return
+            with HOSTS_HISTORY_PATH.open("r", encoding="utf-8") as f:
+                loaded = yaml.safe_load(f) or {}
+            
+            source_domains = loaded.get("source_domains", {})
+            if source_id in source_domains:
+                del source_domains[source_id]
+                with HOSTS_HISTORY_PATH.open("w", encoding="utf-8") as f:
+                    yaml.safe_dump(loaded, f, allow_unicode=True, default_flow_style=False, sort_keys=False)
+        except Exception as e:
+            logger.warning(f"删除 Hosts 源域名缓存失败：{e}")
+
     def save_history_ips(self, mapping: dict[str, str], excluded_domains: set[str] | None = None):
         """持久化最近一次成功写入的域名 IP 历史。"""
         excluded = set(excluded_domains or set())
@@ -339,10 +384,18 @@ class HostsService:
             for domain, ip in mapping.items()
             if domain and domain not in excluded and ip and self._is_valid_ip(ip)
         }
-        payload = {"history": history}
+        loaded = {}
+        if HOSTS_HISTORY_PATH.exists():
+            try:
+                with HOSTS_HISTORY_PATH.open("r", encoding="utf-8") as f:
+                    loaded = yaml.safe_load(f) or {}
+            except Exception as e:
+                logger.warning(f"读取 Hosts 历史文件失败：{e}")
+
+        loaded["history"] = history
         HOSTS_HISTORY_PATH.parent.mkdir(parents=True, exist_ok=True)
         with HOSTS_HISTORY_PATH.open("w", encoding="utf-8") as f:
-            yaml.safe_dump(payload, f, allow_unicode=True, default_flow_style=False, sort_keys=False)
+            yaml.safe_dump(loaded, f, allow_unicode=True, default_flow_style=False, sort_keys=False)
 
 
 
@@ -382,7 +435,12 @@ class HostsService:
             return {}
         return self.parse_hosts_content(managed_content)
 
-    def apply_history_fallback(self, selected_map: dict[str, str], excluded_domains: set[str] | None = None) -> tuple[dict[str, str], dict[str, dict]]:
+    def apply_history_fallback(
+        self,
+        selected_map: dict[str, str],
+        excluded_domains: set[str] | None = None,
+        active_domains: set[str] | None = None,
+    ) -> tuple[dict[str, str], dict[str, dict]]:
         """为本轮缺失域名补入当前 Managed Hosts / 历史中的最近成功 IP。"""
         merged = selected_map.copy()
         fallback_details: dict[str, dict] = {}
@@ -390,11 +448,11 @@ class HostsService:
 
         current_hosts = {
             domain: ip for domain, ip in self.get_managed_hosts_mapping().items()
-            if domain not in excluded
+            if domain not in excluded and (active_domains is None or domain in active_domains)
         }
         history_hosts = {
             domain: ip for domain, ip in self.get_history_ips().items()
-            if domain not in excluded
+            if domain not in excluded and (active_domains is None or domain in active_domains)
         }
         fallback_sources = [current_hosts, history_hosts]
 

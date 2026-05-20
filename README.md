@@ -407,9 +407,26 @@ docker build -t pt-accelerator:new .
 
 ## 🏷️ 版本信息
 
-当前项目版本：`3.0.6`
+当前项目版本：`3.0.7`
 
 ### 更新日志
+
+#### v3.0.7 (2026-05-20)
+
+**🌐 Hosts/DNS 联动优化与 Hosts 源写入修复**
+- 修复了 Hosts 源管理中已被禁用的源在 IP 优选任务完成后依然会被错误写入本地 Hosts 的问题（在 `HostsPipeline` 中过滤掉已禁用的源）
+- 支持直接在 `hosts_history.yaml` 中管理源与域名关系的本地缓存机制，精简了配置项
+
+**🖥️ 优选 IP 状态显示优化**
+- 重构 Tracker 管理页面，允许正确回显非 Tracker 的 Cloudflare 域名在优选后的最新 IP（不再一直显示“未设置”）
+
+**🔐 通知渠道参数回显与敏感凭证防覆盖加固**
+- 升级企业微信应用渠道的脱敏算法，仅对敏感凭据（`corpid`, `corpsecret`, `agentid`）进行屏蔽掩码，保留非敏感项（`touser`, `media_id`）明文回显，保证前端表单能正常渲染和编辑
+- 新增配置更新时的旧凭证合并还原机制，当用户更新渠道设置时，对于未变更的掩码参数（`********`）在写入配置文件时自动从旧配置中提取真实密文还原，彻底解决保存时真实凭据被静默覆盖损坏的问题
+- 支持企业微信应用渠道“转发代理地址” (`QYWX_ORIGIN`) 的 AES 加密存储，进一步防范配置泄露风险
+
+<details>
+<summary>查看历史更新日志</summary>
 
 #### v3.0.6 (2026-05-18)
 
@@ -446,9 +463,6 @@ docker build -t pt-accelerator:new .
 - 离线管理员重置 CLI 的预期失败改为错误日志输出，不再直接抛 traceback
 - 为离线管理员重置失败日志统一增加 `[offline-reset]` 前缀，便于检索与告警
 - README 新增环境变量章节，补充 `APP_SECRET_KEY`、`ADMIN_RESET_KEY`、`TRUSTED_PROXY_IPS`、`COOKIE_SECURE`、`ALLOW_REMOTE_INIT` 等说明
-
-<details>
-<summary>查看历史更新日志</summary>
 
 #### v3.0.4 (2026-05-12)
 

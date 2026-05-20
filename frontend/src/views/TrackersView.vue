@@ -408,6 +408,7 @@
 <script setup lang="ts">
 import { ref, onMounted, reactive, computed } from 'vue';
 import { useTrackerStore, type Tracker } from '@/stores/modules/trackers';
+import { useHostsStore } from '@/stores/modules/hosts';
 import { useToast } from '@/composables/useToast';
 import { useConfirm } from '@/composables/useConfirm';
 import { getErrorMessage } from '@/utils/error';
@@ -432,6 +433,7 @@ const normalizeDomain = (value: string) => {
 };
 
 const store = useTrackerStore();
+const hostsStore = useHostsStore();
 const toast = useToast();
 const { confirm } = useConfirm();
 const isAddTrackerModalOpen = ref(false);
@@ -445,6 +447,7 @@ const cloudflareDomains = ref<string[]>([]);
 const cloudflareDomainDraft = ref('');
 const activeTrackerTab = ref<'trackers' | 'cloudflare'>('trackers');
 const isLoadingCloudflareDomains = ref(false);
+const hostsIps = ref<Record<string, string>>({});
 
 const isAddingCloudflareDomain = ref(false);
 const forceCloudflare = ref(false);
@@ -535,6 +538,23 @@ const newTracker = reactive<TrackerDraft>({
 const batchDomains = ref('');
 const batchIpDraft = ref('');
 
+const fetchHostsIps = async () => {
+  try {
+    const res = await hostsStore.fetchIps();
+    if (res?.data?.ips) {
+      const mapping: Record<string, string> = {};
+      res.data.ips.forEach((item: any) => {
+        if (item.tracker) {
+          mapping[normalizeDomain(item.tracker)] = item.ip;
+        }
+      });
+      hostsIps.value = mapping;
+    }
+  } catch (e) {
+    console.error('获取 Hosts IP 失败:', e);
+  }
+};
+
 const refreshCloudflareDomains = async (silent = false) => {
   if (!silent) {
     isLoadingCloudflareDomains.value = true;
@@ -542,6 +562,7 @@ const refreshCloudflareDomains = async (silent = false) => {
 
   try {
     cloudflareDomains.value = await store.loadCloudflareDomains();
+    await fetchHostsIps();
   } catch (e: any) {
     const detail = getErrorMessage(e);
     toast.error(`获取 Cloudflare 域名名单失败: ${detail}`);
@@ -555,7 +576,6 @@ onMounted(async () => {
     store.fetchTrackers(),
     refreshCloudflareDomains(true),
   ]);
-
 });
 
 
@@ -725,7 +745,8 @@ const getCloudflareTrackerIp = (domain: string): string => {
   const normalizedDomain = normalizeDomain(domain);
   if (!normalizedDomain) return '—';
   const tracker = store.trackers.find(t => normalizeDomain(t.url) === normalizedDomain);
-  return tracker?.ip || '未设置';
+  if (tracker?.ip) return tracker.ip;
+  return hostsIps.value[normalizedDomain] || '未设置';
 };
 </script>
 

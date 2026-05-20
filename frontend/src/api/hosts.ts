@@ -27,6 +27,13 @@ export interface HostsSourceUpdateIn {
     enabled?: boolean;
 }
 
+export interface HostsIp {
+    tracker: string;
+    ip: string;
+    source: string;
+    updated_at?: string;
+}
+
 // ==================== Hosts 源 CRUD ====================
 
 export const hosts = {
@@ -54,7 +61,7 @@ export const hosts = {
 
     // 获取 tracker IP 映射
     getTrackerIps: () =>
-        api.get<{ ips: Record<string, string>; total: number }>('/hosts/ips'),
+        api.get<{ ips: HostsIp[]; total: number }>('/hosts/ips'),
 
     // 获取当前 Hosts 文件内容
     getContent: () =>
