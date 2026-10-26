@@ -94,6 +94,22 @@ export const useTrackerStore = defineStore('trackers', {
             await this.fetchTrackers();
         },
 
+        async deleteTrackers(trackerIds: string[]) {
+            const deletedIds: string[] = [];
+            const failedIds: string[] = [];
+            // Serialize writes: the backend persists the complete Tracker list.
+            for (const id of new Set(trackerIds)) {
+                try {
+                    await trackers.delete(id);
+                    deletedIds.push(id);
+                    this.trackers = this.trackers.filter(item => item.id !== id);
+                } catch {
+                    failedIds.push(id);
+                }
+            }
+            return { deletedIds, failedIds };
+        },
+
         async batchImport(urls: string[], enabled = true) {
             const response = await trackers.batchImport(urls, enabled);
             await this.fetchTrackers();
@@ -122,11 +138,17 @@ export const useTrackerStore = defineStore('trackers', {
         },
 
         async includeCloudflareDomain(domain: string | undefined) {
-            const normalized = normalizeDomain(domain || '');
-            if (!normalized) return;
+            return this.includeCloudflareDomains([domain || '']);
+        },
+
+        async includeCloudflareDomains(domains: string[]) {
+            const normalized = domains.map(normalizeDomain).filter(Boolean);
+            if (!normalized.length) return 0;
             const current = await this.loadCloudflareDomains();
-            await trackers.updateCloudflareDomains([...current, normalized]);
+            const merged = Array.from(new Set([...current, ...normalized]));
+            await trackers.updateCloudflareDomains(merged);
             await this.fetchTrackers();
+            return merged.length - current.length;
         },
 
         async excludeCloudflareDomain(domain: string | undefined) {

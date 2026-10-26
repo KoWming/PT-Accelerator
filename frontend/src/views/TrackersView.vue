@@ -118,6 +118,18 @@
 
         <div class="trackers-content-area">
           <template v-if="activeTrackerTab === 'trackers'">
+            <div v-if="store.trackers.length" class="tracker-bulk-toolbar" aria-label="Tracker 批量操作">
+              <label class="tracker-select-all">
+                <input type="checkbox" :checked="allTrackersSelected" :indeterminate="selectedTrackers.length > 0 && !allTrackersSelected" :disabled="isBulkOperating || store.loading" @change="selectAllTrackers(($event.target as HTMLInputElement).checked)">
+                全选
+              </label>
+              <span aria-live="polite">已选 {{ selectedTrackers.length }} 条</span>
+              <button type="button" class="tracker-action-btn tracker-action-success" :disabled="!selectedTrackers.length || isBulkOperating || store.loading" @click="batchIncludeCloudflare">
+                {{ isBulkOperating ? '处理中…' : '批量加入 Cloudflare 名单' }}
+              </button>
+              <button type="button" class="tracker-action-btn tracker-action-danger" :disabled="!selectedTrackers.length || isBulkOperating || store.loading" @click="batchDeleteTrackers">批量删除</button>
+              <button type="button" class="tracker-action-btn" :disabled="!selectedTrackers.length || isBulkOperating" @click="selectedTrackerIds = []">取消选择</button>
+            </div>
             <div v-if="store.loading" class="workspace-empty trackers-loading">
               <div class="spinner-border text-primary" role="status">
                 <span class="visually-hidden">Loading...</span>
@@ -164,7 +176,10 @@
               <div class="tracker-table-body">
                 <div class="tracker-row" v-for="tracker in sortedTrackers" :key="tracker.id || tracker.url">
                   <div class="tracker-col-name">
-                    <strong>{{ tracker.name }}</strong>
+                    <label class="tracker-row-selection">
+                      <input type="checkbox" :aria-label="`选择 ${tracker.name || tracker.url}`" :checked="Boolean(tracker.id && selectedTrackerIds.includes(tracker.id))" :disabled="!tracker.id || isBulkOperating" @change="selectTracker(tracker.id, ($event.target as HTMLInputElement).checked)">
+                      <strong>{{ tracker.name }}</strong>
+                    </label>
                   </div>
                   <div class="tracker-col-network">
                     <div class="tracker-col-domain mono-text" :title="tracker.url">{{ tracker.url }}</div>
@@ -172,7 +187,7 @@
                   </div>
                   <div class="tracker-col-switch">
                     <label class="switch tracker-switch">
-                      <input type="checkbox" :checked="tracker.enabled" @change="toggleTracker(tracker)">
+                      <input type="checkbox" :checked="tracker.enabled" :disabled="isBulkOperating" @change="toggleTracker(tracker)">
                       <div class="slider">
                         <div class="circle">
                           <svg class="cross" xml:space="preserve" style="enable-background:new 0 0 512 512" viewBox="0 0 365.696 365.696" y="0" x="0" height="6" width="6" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" xmlns="http://www.w3.org/2000/svg">
@@ -190,14 +205,14 @@
                     </label>
                   </div>
                   <div class="tracker-col-actions">
-                    <button class="tracker-action-btn tracker-action-success" @click="addTrackerDomainToCloudflareList(tracker)">
+                    <button class="tracker-action-btn tracker-action-success" :disabled="isBulkOperating" @click="addTrackerDomainToCloudflareList(tracker)">
                       <span>
                         <i class="bx bx-shield-plus"></i>
                         <span>加入 Cloudflare 名单</span>
                       </span>
                     </button>
 
-                    <button class="tracker-action-btn tracker-action-danger" @click="confirmDelete(tracker)">
+                    <button class="tracker-action-btn tracker-action-danger" :disabled="isBulkOperating" @click="confirmDelete(tracker)">
                       <span>
                         <i class="bx bx-trash"></i>
                         <span>删除</span>
@@ -406,7 +421,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, reactive, computed } from 'vue';
+import { ref, onMounted, reactive, computed, watch } from 'vue';
 import { useTrackerStore, type Tracker } from '@/stores/modules/trackers';
 import { useHostsStore } from '@/stores/modules/hosts';
 import { useToast } from '@/composables/useToast';
@@ -441,6 +456,69 @@ const isBatchImportModalOpen = ref(false);
 const isAddingTracker = ref(false);
 const isBatchImportingTrackers = ref(false);
 const isUpdatingAllTrackerIp = ref(false);
+const selectedTrackerIds = ref<string[]>([]);
+const isBulkOperating = ref(false);
+const selectedTrackers = computed(() => store.trackers.filter(item => item.id && selectedTrackerIds.value.includes(item.id)));
+const selectableTrackers = computed(() => store.trackers.filter(item => item.id));
+const allTrackersSelected = computed(() => selectableTrackers.value.length > 0 && selectedTrackers.value.length === selectableTrackers.value.length);
+
+watch(() => store.trackers.map(item => item.id), (ids) => {
+  const existing = new Set(ids);
+  selectedTrackerIds.value = selectedTrackerIds.value.filter(id => existing.has(id));
+});
+
+const selectTracker = (id: string | undefined, checked: boolean) => {
+  if (!id) return;
+  selectedTrackerIds.value = checked
+    ? Array.from(new Set([...selectedTrackerIds.value, id]))
+    : selectedTrackerIds.value.filter(value => value !== id);
+};
+
+const selectAllTrackers = (checked: boolean) => {
+  selectedTrackerIds.value = checked ? selectableTrackers.value.map(item => item.id!) : [];
+};
+
+const batchIncludeCloudflare = async () => {
+  if (isBulkOperating.value || !selectedTrackers.value.length) return;
+  const selected = [...selectedTrackers.value];
+  const domains = Array.from(new Set(selected.map(item => normalizeDomain(item.url)).filter(Boolean)));
+  if (!domains.length) {
+    toast.error('所选 Tracker 没有有效域名');
+    return;
+  }
+  isBulkOperating.value = true;
+  try {
+    if (!await confirm(`确定将所选 ${selected.length} 条 Tracker 的 ${domains.length} 个域名加入 Cloudflare 名单吗？已有域名会自动去重。`, '批量加入 Cloudflare 名单')) return;
+    const added = await store.includeCloudflareDomains(domains);
+    selectedTrackerIds.value = [];
+    cloudflareDomains.value = await store.loadCloudflareDomains();
+    toast.success(`已处理 ${domains.length} 个域名，新增 ${added} 个`);
+  } catch (e) {
+    toast.error(`批量加入失败: ${getErrorMessage(e)}`);
+  } finally {
+    isBulkOperating.value = false;
+  }
+};
+
+const batchDeleteTrackers = async () => {
+  if (isBulkOperating.value || !selectedTrackers.value.length) return;
+  const ids = selectedTrackers.value.map(item => item.id!);
+  isBulkOperating.value = true;
+  try {
+    if (!await confirm(`确定删除所选 ${ids.length} 条 Tracker 吗？此操作不可撤销，Cloudflare 域名名单将保留。`, '批量删除 Tracker')) return;
+    const { deletedIds, failedIds } = await store.deleteTrackers(ids);
+    selectedTrackerIds.value = failedIds;
+    if (failedIds.length) {
+      toast.error(`已删除 ${deletedIds.length} 条，${failedIds.length} 条失败，失败项已保留选择，可重试`);
+    } else {
+      toast.success(`已删除 ${deletedIds.length} 条 Tracker`);
+    }
+  } catch (e) {
+    toast.error(`批量删除失败: ${getErrorMessage(e)}`);
+  } finally {
+    isBulkOperating.value = false;
+  }
+};
 
 const isClearingTrackers = ref(false);
 const cloudflareDomains = ref<string[]>([]);
@@ -751,6 +829,38 @@ const getCloudflareTrackerIp = (domain: string): string => {
 </script>
 
 <style scoped>
+.tracker-bulk-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.8rem 0.9rem;
+  border-bottom: 1px solid rgba(161, 172, 184, 0.12);
+}
+
+.tracker-select-all,
+.tracker-row-selection {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-width: 0;
+  cursor: pointer;
+}
+
+.tracker-row-selection input,
+.tracker-select-all input {
+  flex-shrink: 0;
+  width: 1rem;
+  height: 1rem;
+  accent-color: var(--bs-primary, #696cff);
+}
+
+.tracker-bulk-toolbar button:disabled,
+.tracker-col-actions button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .dashboard-redesign {
   display: flex;
   flex-direction: column;
