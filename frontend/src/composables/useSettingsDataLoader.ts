@@ -50,6 +50,7 @@ interface UseSettingsDataLoaderOptions {
     download_count: number;
     download_time: number;
     timeout_seconds: number;
+    empty_result_retries: number;
     tcp_port: number;
     url: string;
     min_delay: number;
@@ -201,7 +202,7 @@ export const useSettingsDataLoader = ({
       cfstResults.value = Array.isArray(data.results) ? data.results.map(normalizeCfstResult) : [];
       cfstBestIp.value = data.best_ip || '';
       cfstResultFile.value = data.result_file ? './' + data.result_file.split(/[\\/]/).slice(-2).join('/') : '';
-      cfstLastUpdated.value = new Date().toISOString();
+      cfstLastUpdated.value = data.updated_at || cfstStatus.value.completed_at || '';
     } catch (e: any) {
       if (!silent) {
         toast.error('获取测速结果失败: ' + getErrorMessage(e, '请求失败，请稍后重试'));
@@ -224,6 +225,7 @@ export const useSettingsDataLoader = ({
         result_count: Number(data.result_count ?? 0),
         message: data.message || (data.running ? '测速中' : '空闲'),
         started_at: data.started_at || null,
+        completed_at: data.completed_at || null,
       };
 
       runningCfst.value = Boolean(cfstStatus.value.running);
@@ -290,6 +292,7 @@ export const useSettingsDataLoader = ({
     cfstForm.download_count = getCfstNumberValue(cfstData.download_count, cfstDefaults.download_count);
     cfstForm.download_time = toCfstDisplayValue(cfstData.download_time, cfstDefaults.download_time);
     cfstForm.timeout_seconds = toCfstDisplayValue(getCfstTimeoutValue(cfstData), cfstDefaults.timeout_seconds);
+    cfstForm.empty_result_retries = toCfstDisplayValue(cfstData.empty_result_retries, cfstDefaults.empty_result_retries);
     cfstForm.tcp_port = toCfstDisplayValue(cfstData.tcp_port, cfstDefaults.tcp_port);
     cfstForm.url = toCfstDisplayText(cfstData.url, cfstDefaults.url);
     cfstForm.httping = Boolean(cfstData.httping);

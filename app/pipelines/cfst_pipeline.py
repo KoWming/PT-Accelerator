@@ -78,7 +78,12 @@ class CfstPipeline:
 
             runtime_config = self._cfst.get_runtime_config()
             cfst_timeout = max(int(runtime_config.get("timeout_seconds", 300) or 300), 30)
-            max_wait = cfst_timeout + 30
+            retry_count = max(int(runtime_config.get("empty_result_retries", 3) or 0), 0)
+            retry_enabled = (
+                not bool(runtime_config.get("debug", False))
+                and float(runtime_config.get("min_speed", 0) or 0) > 0
+            )
+            max_wait = cfst_timeout * (1 + retry_count if retry_enabled else 1) + 30
             waited = 0
 
             while waited < max_wait:

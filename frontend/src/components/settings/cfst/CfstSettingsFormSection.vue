@@ -157,6 +157,11 @@
             <div class="settings-field-hint">测速结束后直接展示的结果数量；设为 0 时不显示结果直接退出。</div>
           </div>
 
+          <div class="settings-field-card">
+            <label class="form-label settings-form-label">无达标结果重试次数 <span class="settings-default-badge">默认 3 次</span></label>
+            <input type="number" class="form-control settings-standalone-input" :value="cfstForm.empty_result_retries ?? ''" min="0" max="10" placeholder="3" @input="updateNumberField('empty_result_retries', ($event.target as HTMLInputElement).value)">
+            <div class="settings-field-hint">关闭调试模式且设置下载速度下限后，若没有 IP 达到要求，将自动重新测速。设置为 0 表示不重试，最多可重试 10 次。</div>
+          </div>
           <label class="form-check settings-check-card settings-check-card-half">
             <input class="form-check-input" type="checkbox" :checked="cfstForm.disable_download" @change="updateBooleanField('disable_download', ($event.target as HTMLInputElement).checked)">
             <span>
@@ -204,6 +209,7 @@ type CfstNumberField =
   | 'download_count'
   | 'download_time'
   | 'timeout_seconds'
+  | 'empty_result_retries'
   | 'tcp_port'
   | 'min_delay'
   | 'max_delay'

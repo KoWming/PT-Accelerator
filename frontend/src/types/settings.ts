@@ -39,6 +39,7 @@ export interface CfstFormState {
   download_count: number | null;
   download_time: number | null;
   timeout_seconds: number | null;
+  empty_result_retries: number | null;
   tcp_port: number | null;
   url: string;
   httping: boolean;
@@ -56,6 +57,9 @@ export interface CfstFormState {
 }
 
 export interface IkuaiDnsFormState {
+  api_version: "legacy" | "v4";
+  token: string;
+  verify_tls: boolean;
   enable: boolean;
   url: string;
   username: string;
@@ -115,6 +119,7 @@ export interface CfstStatusState {
   result_count: number;
   message: string;
   started_at: string | null;
+  completed_at: string | null;
 }
 
 export interface CfstResultItem {

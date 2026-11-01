@@ -41,6 +41,7 @@ interface UseSettingsCfstActionsOptions {
     download_count: number;
     download_time: number;
     timeout_seconds: number;
+    empty_result_retries: number;
     tcp_port: number;
     url: string;
     min_delay: number;
@@ -91,6 +92,7 @@ export const useSettingsCfstActions = ({
         download_count: getCfstNumberValue(cfstForm.download_count, cfstDefaults.download_count),
         download_time: getCfstNumberValue(cfstForm.download_time, cfstDefaults.download_time),
         timeout_seconds: Math.max(getCfstNumberValue(cfstForm.timeout_seconds, cfstDefaults.timeout_seconds), 30),
+        empty_result_retries: getCfstNumberValue(cfstForm.empty_result_retries, cfstDefaults.empty_result_retries),
         tcp_port: getCfstNumberValue(cfstForm.tcp_port, cfstDefaults.tcp_port),
         url: getCfstStringValue(cfstForm.url, ''),
         httping: Boolean(cfstForm.httping),
@@ -145,6 +147,7 @@ export const useSettingsCfstActions = ({
         result_count: 0,
         message: data.message || 'Cloudflare IP 优选任务已启动',
         started_at: new Date().toISOString(),
+        completed_at: null,
       };
 
       toast.success(data.message || 'Cloudflare IP 优选任务已启动');

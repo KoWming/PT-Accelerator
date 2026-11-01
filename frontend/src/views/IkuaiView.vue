@@ -35,6 +35,7 @@
         :deleting-ids="deletingRecordIds"
         :exporting="exportingIkuaiDns"
         :importing="importingIkuaiDns"
+        :transfer-unsupported="ikuaiDnsForm.api_version === 'v4'"
         @refresh="fetchDnsRecords"
         @toggle-record="toggleDnsRecord"
         @delete-record="deleteDnsRecord"
@@ -263,6 +264,9 @@ const activeRemoteTab = ref<'ikuai' | 'mihosts'>('ikuai');
 
 // 爱快 DNS 表单
 const ikuaiDnsForm = reactive<IkuaiDnsFormState>({
+  api_version: "legacy",
+  token: "",
+  verify_tls: true,
   enable: false,
   url: '',
   username: 'admin',
@@ -316,6 +320,9 @@ const fetchIkuaiSettings = async () => {
   const ikuaiResponse = await ikuai.getStatus();
   const ikuaiData = (ikuaiResponse.data || {}) as IkuaiStatus & { password?: string };
 
+  ikuaiDnsForm.api_version = ikuaiData.api_version || "legacy";
+  ikuaiDnsForm.token = ikuaiData.token || "";
+  ikuaiDnsForm.verify_tls = ikuaiData.verify_tls !== false;
   ikuaiDnsForm.enable = Boolean(ikuaiData.enabled);
   ikuaiDnsForm.url = formatIkuaiUrlFromStatus(ikuaiData);
   ikuaiDnsForm.username = ikuaiData.username || 'admin';

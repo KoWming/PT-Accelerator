@@ -77,6 +77,7 @@ class CfstConfigIn(BaseModel):
 
     download_time: int = Field(default=10, ge=1, le=300)
     timeout_seconds: int = Field(default=300, ge=30, le=3600)
+    empty_result_retries: int = Field(default=3, ge=0, le=10)
     tcp_port: int = Field(default=443, ge=1, le=65535)
     url: str = ""
     httping: bool = False
@@ -146,6 +147,7 @@ class CfstConfigOut(BaseModel):
     download_count: int
     download_time: int
     timeout_seconds: int
+    empty_result_retries: int
     tcp_port: int
     url: str
     httping: bool
@@ -180,6 +182,7 @@ class CfstResultsOut(BaseModel):
     total: int = 0
     best_ip: Optional[str] = None
     result_file: Optional[str] = None
+    updated_at: Optional[datetime] = None
 
 
 class CfstStatusOut(BaseModel):
@@ -188,6 +191,7 @@ class CfstStatusOut(BaseModel):
     progress: int = Field(ge=0, le=100)
     message: str = ""
     started_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
     task_id: Optional[str] = None
     result_count: int = 0
 

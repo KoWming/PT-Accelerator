@@ -68,14 +68,27 @@
 
             <div class="settings-field-grid ikuai-settings-field-grid">
               <div class="settings-field-card settings-field-card-full">
+                <label class="form-label settings-form-label">爱快 API 版本</label>
+                <select class="form-select" :value="ikuaiDnsForm.api_version" @change="updateField('api_version', ($event.target as HTMLSelectElement).value as 'legacy' | 'v4')">
+                  <option value="legacy">旧版（用户名 / 密码）</option>
+                  <option value="v4">4.0（HTTPS / API Token）</option>
+                </select>
+              </div>
+              <div v-if="ikuaiDnsForm.api_version === 'v4'" class="settings-field-card settings-field-card-full">
+                <label class="form-label settings-form-label">API Token</label>
+                <input type="password" autocomplete="new-password" class="form-control" :value="ikuaiDnsForm.token" @input="updateField('token', ($event.target as HTMLInputElement).value)">
+                <label class="mt-2"><input type="checkbox" :checked="ikuaiDnsForm.verify_tls" @change="updateBooleanField('verify_tls', ($event.target as HTMLInputElement).checked)"> 验证 HTTPS 证书</label>
+                <p class="text-muted mb-0">自签名证书未受信任时可关闭验证。4.0 按精确域名同步，仅更新本程序管理的记录；暂不支持旧版 TXT 导入导出。</p>
+              </div>
+              <div class="settings-field-card settings-field-card-full">
                 <label class="form-label settings-form-label">爱快路由器地址</label>
                 <input type="text" class="form-control settings-standalone-input" :value="ikuaiDnsForm.url" placeholder="http://192.168.1.1" @input="updateField('url', ($event.target as HTMLInputElement).value)">
               </div>
-              <div class="settings-field-card ikuai-credential-field">
+              <div v-if="ikuaiDnsForm.api_version === 'legacy'" class="settings-field-card ikuai-credential-field">
                 <label class="form-label settings-form-label">用户名</label>
                 <input type="text" class="form-control settings-standalone-input" :value="ikuaiDnsForm.username" placeholder="admin" @input="updateField('username', ($event.target as HTMLInputElement).value)">
               </div>
-              <div class="settings-field-card ikuai-credential-field">
+              <div v-if="ikuaiDnsForm.api_version === 'legacy'" class="settings-field-card ikuai-credential-field">
                 <label class="form-label settings-form-label">密码</label>
                 <input type="password" class="form-control settings-standalone-input" :value="ikuaiDnsForm.password" placeholder="请输入爱快密码" @input="updateField('password', ($event.target as HTMLInputElement).value)">
               </div>
@@ -83,7 +96,7 @@
           </section>
 
           <div class="settings-inline-actions settings-cfst-bottom-actions mt-2 ikuai-inline-actions">
-            <button type="button" class="settings-action-btn settings-action-neutral settings-refresh-like-test-btn justify-content-center" @click="$emit('test')" :disabled="testingIkuaiDns || !ikuaiDnsForm.url || !ikuaiDnsForm.password">
+            <button type="button" class="settings-action-btn settings-action-neutral settings-refresh-like-test-btn justify-content-center" @click="$emit('test')" :disabled="testingIkuaiDns || !ikuaiDnsForm.url || !(ikuaiDnsForm.api_version === 'v4' ? ikuaiDnsForm.token : ikuaiDnsForm.password)">
               <span v-if="testingIkuaiDns" class="spinner-border spinner-border-sm me-2"></span>
               <i v-else class="bx bx-plug me-2"></i>测试连接
             </button>
@@ -166,11 +179,11 @@ const emit = defineEmits<{
   <K extends keyof IkuaiDnsFormState>(event: 'updateField', field: K, value: IkuaiDnsFormState[K]): void;
 }>();
 
-const updateField = (field: 'url' | 'username' | 'password', value: string) => {
+const updateField = <K extends keyof IkuaiDnsFormState>(field: K, value: IkuaiDnsFormState[K]) => {
   emit('updateField', field, value);
 };
 
-const updateBooleanField = (field: 'enable', value: boolean) => {
+const updateBooleanField = (field: 'enable' | 'verify_tls', value: boolean) => {
   emit('updateField', field, value);
 };
 </script>

@@ -15,7 +15,7 @@
             <!-- 导出 DNS -->
             <button
               class="ikuai-dns-header-btn"
-              :disabled="exporting"
+              :disabled="exporting || transferUnsupported"
               @click="$emit('export-dns')"
               title="导出 DNS 配置"
             >
@@ -34,7 +34,7 @@
             />
             <button
               class="ikuai-dns-header-btn"
-              :disabled="importing"
+              :disabled="importing || transferUnsupported"
               @click="importFileInput?.click()"
               title="导入 DNS 配置"
             >
@@ -192,6 +192,7 @@ const props = defineProps<{
   exporting?: boolean;
   /** 导入中 */
   importing?: boolean;
+  transferUnsupported?: boolean;
 }>();
 
 const emit = defineEmits<{

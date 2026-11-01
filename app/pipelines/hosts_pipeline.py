@@ -8,6 +8,8 @@ from urllib.parse import urlparse
 from app.config import config
 from app.services.hosts_service import HostsService
 from app.services.ikuai_service import IkuaiService
+from app.services.ikuai_v4_service import create_ikuai_service
+from app.utils.secret_crypto import decrypt_secret
 from app.services.notify_service import build_structured_notification, notify_service
 from app.utils.logger import get_logger
 
@@ -16,6 +18,10 @@ logger = get_logger(__name__)
 
 class HostsPipeline:
     """Hosts 更新管线"""
+
+    @staticmethod
+    def _notification_success(result: dict) -> bool:
+        return bool(result.get("success", False)) and not result.get("errors")
 
     def __init__(self):
         self._hosts = HostsService()
@@ -43,12 +49,14 @@ class HostsPipeline:
         if not config.get("ikuai.enabled", False):
             return None
 
-        service = IkuaiService()
-        service.init_config(
+        service = create_ikuai_service(
             host=config.get("ikuai.host", ""),
             port=None,
             username=config.get("ikuai.username", "admin"),
-            password=config.get("ikuai.password", ""),
+            password=decrypt_secret(config.get("ikuai.password", "")),
+            api_version=config.get("ikuai.api_version", "legacy"),
+            token=decrypt_secret(config.get("ikuai.token", "")),
+            verify_tls=config.get("ikuai.verify_tls", True),
         )
         return service if service.is_enabled else None
 
@@ -83,6 +91,7 @@ class HostsPipeline:
             "ikuai_synced": False,
             "ikuai_sync_count": 0,
             "errors": [],
+            "warnings": [],
         }
 
         try:
@@ -115,7 +124,7 @@ class HostsPipeline:
                     source_fetch_success_count += 1
                 except Exception as e:
                     error_message = f"Hosts 源拉取失败：{source_name}（{source_url}） - {type(e).__name__}: {e}"
-                    result["errors"].append(error_message)
+                    result["warnings"].append(error_message)
                     logger.warning(error_message, exc_info=True)
 
                     # 拉取失败时，如果本地有该源的历史缓存域名，则加载作为活跃域名参与历史兜底
@@ -181,6 +190,7 @@ class HostsPipeline:
                         logger.info(f"iKuai DNS 同步完成：{len(cf_hosts)} 条记录")
                     else:
                         result["errors"].append("iKuai DNS 同步失败")
+                        result["success"] = False
                 finally:
                     service.close()
 
@@ -199,7 +209,8 @@ class HostsPipeline:
         """发送 Hosts / 联动通知"""
         try:
             total_hosts_count = int(result.get("merged_count", 0)) + int(result.get("cf_count", 0))
-            success = bool(result.get("success", False)) and not result.get("errors")
+            success = self._notification_success(result)
+            warnings = result.get("warnings", [])
 
             if notify_context:
                 fallback_domains = result.get("latency_probe_fallback_domains", [])
@@ -213,7 +224,7 @@ class HostsPipeline:
                 lines = [
                     "──────────",
                     "📌 任务类型：IP优选与Hosts更新",
-                    f"{'✅' if success else '❌'} 执行结果：{'任务完成' if success else '任务失败'}",
+                    f"{'✅' if success else '❌'} 执行结果：{'任务完成（有警告）' if success and warnings else '任务完成' if success else '任务失败'}",
                     "──────────",
                     "🎯 优选结果：",
                     f"• 旧 IP：{notify_context.get('old_ip') or '未知'}",
@@ -221,6 +232,7 @@ class HostsPipeline:
                     f"• 测速耗时：{float(notify_context.get('duration_seconds', 0.0)):.2f} 秒",
                     f"• Tracker 更新数：{notify_context.get('tracker_update_count', 0)}",
                     f"• Hosts 记录数：{total_hosts_count}",
+                    *([f"• Hosts 数据源异常：{len(warnings)} 个，已使用可用数据和历史记录继续更新"] if warnings else []),
                     "──────────",
                     "📋 Hosts源统计：",
                     f"• 探测成功数：{result.get('latency_probe_success_count', 0)}",
@@ -242,7 +254,7 @@ class HostsPipeline:
                         ("iKuai 同步数", result.get("ikuai_sync_count", 0)),
                         ("历史补回数", result.get("history_fallback_count", 0)),
                     ],
-                    result_text="任务完成" if success else "任务失败",
+                    result_text=("任务完成（有警告）" if warnings else "任务完成") if success else "任务失败",
                     push_time=datetime.now(),
                 )
 

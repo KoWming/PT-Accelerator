@@ -7,6 +7,9 @@ import api from './axios';
 // ==================== 类型定义 ====================
 
 export interface IkuaiConfig {
+    api_version: "legacy" | "v4";
+    token?: string;
+    verify_tls: boolean;
     enabled: boolean;
     host: string;
     username: string;
@@ -14,6 +17,9 @@ export interface IkuaiConfig {
 }
 
 export interface IkuaiStatus {
+    api_version: "legacy" | "v4";
+    token?: string;
+    verify_tls: boolean;
     enabled: boolean;
     host: string;
     username: string;

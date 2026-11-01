@@ -8,9 +8,15 @@ from urllib.parse import urlparse
 from app.auth import verify_session, verify_csrf_token
 from app.config import config
 from app.services.ikuai_service import IkuaiService
+from app.services.ikuai_v4_service import create_ikuai_service
 from app.utils.secret_crypto import encrypt_secret, decrypt_secret
 
 router = APIRouter(tags=["爱快DNS"])
+
+
+def _sync_failure_message(service: IkuaiService) -> str:
+    detail = getattr(service, "last_sync_error", "")
+    return f"同步失败：{detail}" if isinstance(detail, str) and detail else "同步失败，请检查爱快路由器连接"
 
 
 def _remove_config_key(data: dict[str, Any], key: str) -> None:
@@ -46,12 +52,14 @@ def _get_ikuai_service() -> IkuaiService | None:
     if not config.get("ikuai.enabled", False):
         return None
 
-    service = IkuaiService()
-    service.init_config(
+    service = create_ikuai_service(
         host=config.get("ikuai.host", ""),
         port=None,
         username=config.get("ikuai.username", "admin"),
         password=decrypt_secret(config.get("ikuai.password", "")),
+        api_version=config.get("ikuai.api_version", "legacy"),
+        token=decrypt_secret(config.get("ikuai.token", "")),
+        verify_tls=config.get("ikuai.verify_tls", True),
     )
     return service
 
@@ -69,6 +77,9 @@ def get_status(session: dict = Depends(verify_session)):
         "enabled": enabled,
         "host": host,
         "username": config.get("ikuai.username", "admin"),
+        "api_version": config.get("ikuai.api_version", "legacy"),
+        "token": "********" if config.get("ikuai.token", "") else "",
+        "verify_tls": config.get("ikuai.verify_tls", True),
         # 密码脱敏返回，有值时显示 ********
         "password": "********" if password else "",
     }
@@ -84,12 +95,21 @@ def test_connection(body: dict | None = None, session: dict = Depends(verify_ses
     host = body.get("host", "") or config.get("ikuai.host", "")
     username = body.get("username", "admin") or config.get("ikuai.username", "admin")
     # 若 body 中没有传入新密码，从配置中读取并解密
-    password = body.get("password", "") or decrypt_secret(config.get("ikuai.password", ""))
+    password = body.get("password", "")
+    if not password or password == "********":
+        password = decrypt_secret(config.get("ikuai.password", ""))
+    api_version = body.get("api_version", config.get("ikuai.api_version", "legacy"))
+    token = body.get("token", "")
+    if not token or token == "********":
+        token = decrypt_secret(config.get("ikuai.token", ""))
+    verify_tls = body.get("verify_tls", config.get("ikuai.verify_tls", True))
     port = body.get("port")
-    if port is None:
-        port = None
 
+    if host and api_version == "v4" and "://" not in host:
+        host = "https://" + host
     host, port, _scheme = _normalize_ikuai_endpoint(host, port)
+    if api_version not in ("legacy", "v4") or (api_version == "v4" and _scheme != "https"):
+        return {"success": False, "message": "请选择有效的 API 版本；4.0 必须使用 HTTPS"}
 
     enabled = body.get("enabled")
     if enabled is None:
@@ -101,15 +121,15 @@ def test_connection(body: dict | None = None, session: dict = Depends(verify_ses
     if not host:
         return {"success": False, "message": "请先填写爱快路由器地址"}
 
-    if not password:
-        return {"success": False, "message": "请先填写爱快密码"}
+    if not (token if api_version == "v4" else password):
+        return {"success": False, "message": "请先填写 API Token" if api_version == "v4" else "请先填写爱快密码"}
 
-    service = IkuaiService()
-    service.init_config(
+    service = create_ikuai_service(
         host=host,
         port=port,
         username=username,
         password=password,
+        api_version=api_version, token=token, verify_tls=verify_tls,
     )
 
     success, message = service.test_connection()
@@ -129,10 +149,13 @@ def get_records(session: dict = Depends(verify_session)):
     if not service:
         return {"success": False, "message": "爱快 DNS 功能未启用", "records": []}
 
-    records = service.get_dns_records()
-    service.close()
-
-    return {"success": True, "records": records}
+    try:
+        records = service.get_dns_records()
+        return {"success": True, "records": records}
+    except Exception:
+        return {"success": False, "message": "读取爱快 DNS 规则失败", "records": []}
+    finally:
+        service.close()
 
 
 @router.post("/sync")
@@ -157,7 +180,7 @@ def sync_dns(hosts: list[dict], session: dict = Depends(verify_session), _csrf: 
     if success:
         return {"success": True, "message": f"成功同步 {len(hosts)} 条记录"}
     else:
-        return {"success": False, "message": "同步失败，请检查爱快路由器连接"}
+        return {"success": False, "message": _sync_failure_message(service)}
 
 
 @router.post("/sync-now")
@@ -213,7 +236,7 @@ def sync_now(session: dict = Depends(verify_session), _csrf: None = Depends(veri
                 "records": cf_hosts,
             }
         else:
-            return {"success": False, "message": "同步失败，请检查爱快路由器连接"}
+            return {"success": False, "message": _sync_failure_message(service)}
     except Exception as e:
         return {"success": False, "message": f"同步出错：{e}"}
 
@@ -228,29 +251,44 @@ def save_config(body: dict, session: dict = Depends(verify_session), _csrf: None
     """
     enabled = body.get("enabled", False)
     host = body.get("host", "")
+    api_version = body.get("api_version", config.get("ikuai.api_version", "legacy"))
+    token = body.get("token", "")
+    if not token or token == "********":
+        token = decrypt_secret(config.get("ikuai.token", ""))
+    verify_tls = body.get("verify_tls", config.get("ikuai.verify_tls", True))
     port = body.get("port")
     username = body.get("username", "admin")
     password = body.get("password", "")
+    if not password or password == "********":
+        password = decrypt_secret(config.get("ikuai.password", ""))
 
+    if host and api_version == "v4" and "://" not in host:
+        host = "https://" + host
     host, port, _scheme = _normalize_ikuai_endpoint(host, port)
+    if api_version not in ("legacy", "v4") or (api_version == "v4" and _scheme != "https"):
+        return {"success": False, "message": "请选择有效的 API 版本；4.0 必须使用 HTTPS"}
 
     # 保存到配置
     config.set("ikuai.enabled", enabled)
     config.set("ikuai.host", host)
     config.set("ikuai.username", username)
+    config.set("ikuai.api_version", api_version)
+    config.set("ikuai.verify_tls", verify_tls)
+    if body.get("token") and body["token"] != "********":
+        config.set("ikuai.token", encrypt_secret(body["token"]))
     _remove_config_key(config._data, "ikuai.port")
     _remove_config_key(config._data, "ikuai.use_https")
 
     # 只有密码不为空时才更新，写入前加密
-    if password:
+    if password and password != "********":
         config.set("ikuai.password", encrypt_secret(password))
 
     config.save()
 
     # 如果启用了配置，测试连接
-    if enabled and host and password:
-        service = IkuaiService()
-        service.init_config(host=host, port=port, username=username, password=password)
+    if enabled and host and (token if api_version == "v4" else password):
+        service = create_ikuai_service(host=host, port=port, username=username, password=password,
+                                       api_version=api_version, token=token, verify_tls=verify_tls)
         success, message = service.test_connection()
         service.close()
 

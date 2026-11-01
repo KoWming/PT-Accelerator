@@ -82,6 +82,7 @@ async def get_status(session: dict = Depends(verify_session)):
             result_count=status["result_count"],
             message=status["message"],
             started_at=status["started_at"],
+            completed_at=status["completed_at"],
         ).model_dump()
     ).model_dump()
 
@@ -106,6 +107,7 @@ async def get_results(session: dict = Depends(verify_session)):
             total=len(results),
             best_ip=best_ip,
             result_file=result_file,
+            updated_at=cfst_service.get_last_updated(),
         ).model_dump()
     ).model_dump()
 
@@ -140,6 +142,7 @@ async def update_cfst_config(
     config.set("cfst.download_count", req.download_count)
     config.set("cfst.download_time", req.download_time)
     config.set("cfst.timeout_seconds", req.timeout_seconds)
+    config.set("cfst.empty_result_retries", req.empty_result_retries)
 
 
     config.set("cfst.tcp_port", req.tcp_port)

@@ -53,7 +53,7 @@ export const useSettingsIkuaiActions = ({
     if (!rawUrl) return '';
 
     const hasProtocol = /^https?:\/\//i.test(rawUrl);
-    const normalizedUrl = hasProtocol ? rawUrl : `http://${rawUrl}`;
+    const normalizedUrl = hasProtocol ? rawUrl : `${ikuaiDnsForm.api_version === 'v4' ? 'https' : 'http'}://${rawUrl}`;
     const parsed = new URL(normalizedUrl);
     const useHttps = parsed.protocol === 'https:';
     const port = parsed.port ? Number(parsed.port) : (useHttps ? 443 : 80);
@@ -68,6 +68,8 @@ export const useSettingsIkuaiActions = ({
     const payload: Record<string, any> = {
       enabled: Boolean(ikuaiDnsForm.enable),
       host,
+      api_version: ikuaiDnsForm.api_version,
+      verify_tls: ikuaiDnsForm.verify_tls,
       username: ikuaiDnsForm.username || 'admin',
     };
 
@@ -75,6 +77,9 @@ export const useSettingsIkuaiActions = ({
       payload.password = ikuaiDnsForm.password;
     }
 
+    if (ikuaiDnsForm.token && ikuaiDnsForm.token !== "********") {
+      payload.token = ikuaiDnsForm.token;
+    }
     return payload;
   };
 
@@ -86,7 +91,10 @@ export const useSettingsIkuaiActions = ({
   const saveIkuaiDnsSettings = async () => {
     savingIkuaiDns.value = true;
     try {
-      await ikuai.saveConfig(buildIkuaiDnsPayload());
+      const response = await ikuai.saveConfig(buildIkuaiDnsPayload());
+      if (response.data?.success === false) {
+        throw new Error(response.data.message || '保存或连接测试失败');
+      }
       await reloadIkuaiSection(
         '远程同步管理已保存',
         '爱快 DNS 同步开关与连接参数已刷新，可继续执行连接测试。',

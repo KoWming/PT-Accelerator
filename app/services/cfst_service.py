@@ -42,6 +42,7 @@ class CfstService:
         self._results: list[dict] = []
         self._task_id: Optional[str] = None
         self._started_at: Optional[datetime] = None
+        self._completed_at: Optional[datetime] = None
         self._progress = 0
         self._status_message = "空闲"
         self._lock = threading.Lock()
@@ -57,6 +58,10 @@ class CfstService:
     @property
     def started_at(self) -> Optional[datetime]:
         return self._started_at
+
+    @property
+    def completed_at(self) -> Optional[datetime]:
+        return self._completed_at
 
     @property
     def csv_results_file(self) -> Path:
@@ -104,6 +109,7 @@ class CfstService:
             "download_count": config.get("cfst.download_count", default=20),
             "download_time": config.get("cfst.download_time", default=10),
             "timeout_seconds": config.get("cfst.timeout_seconds", default=300),
+            "empty_result_retries": config.get("cfst.empty_result_retries", default=3),
             "tcp_port": config.get("cfst.tcp_port", default=443),
             "url": config.get("cfst.url", default="") or "",
             "httping": self._normalize_bool(config.get("cfst.httping", default=False)),
@@ -380,6 +386,7 @@ class CfstService:
             self._running = True
             self._task_id = task_id
             self._started_at = datetime.now()
+            self._completed_at = None
             self._progress = 0
             self._status_message = "测速进行中"
             self._results = []
@@ -392,39 +399,39 @@ class CfstService:
         logger.info(f"CFST 后台任务已启动：{task_id}")
         return task_id
 
+    @staticmethod
+    def _empty_result_retry_count(runtime_config: dict) -> int:
+        """Return bounded retries for a strict minimum-speed run."""
+        if bool(runtime_config.get("debug", False)):
+            return 0
+        try:
+            min_speed = float(runtime_config.get("min_speed", 0) or 0)
+            retries = int(runtime_config.get("empty_result_retries", 3) or 0)
+        except (TypeError, ValueError):
+            return 0
+        if min_speed <= 0:
+            return 0
+        return max(0, min(retries, 10))
+
     def _run_sync(self):
         process: subprocess.Popen | None = None
         try:
             binary_path = self.get_binary()
             runtime_config = self.get_runtime_config()
             result_file = self._get_default_result_file(binary_path)
-            logger.info(f"CFST 二进制路径：{self._to_log_path(binary_path)}")
-
-            self._clear_old_result_file(result_file)
-
-            cmd = self._build_command(binary_path, runtime_config)
-            logger.info(f"CFST 输入文件：{self._to_log_path(self._get_default_ip_file(binary_path))}")
-            logger.info(f"CFST 结果文件：{self._to_log_path(result_file)}")
-            logger.info(f"开始执行 CFST：{self._command_for_log(cmd)}")
+            retry_count = self._empty_result_retry_count(runtime_config)
+            attempt_count = retry_count + 1
             timeout_seconds = max(int(runtime_config.get("timeout_seconds", 300) or 300), 30)
-            process = subprocess.Popen(
-                cmd,
-                stdin=subprocess.DEVNULL,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=False,
-                cwd=str(binary_path.parent),
-            )
+            cmd = self._build_command(binary_path, runtime_config)
+            logger.info("CFST binary: %s", self._to_log_path(binary_path))
+            logger.info("CFST input: %s", self._to_log_path(self._get_default_ip_file(binary_path)))
+            logger.info("CFST output: %s", self._to_log_path(result_file))
 
-
-            # 启动后台线程实时转发 CFST 输出到日志
-            # 过滤掉刷屏内容：光标进度条、测速结果行、完成提示、退出提示
             import re as _re
 
             _skip_pattern = _re.compile(
-                r"[↘↙↖↗→←↑↓]|[▊▋▌▍▎▏]|[═\-_]{10,}|^\s*\[[\d\/\s]+\]\s*\["   # 光标进度条
-                r"|^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\s+\d+"               # 测速结果行（IP + 数字）
-                r"|完整测速结果已写入|按下.*退出"                             # 完成/退出提示
+                r"^\s*\[[\d/\s]+\]\s*\["
+                r"|^\d{1,3}(?:\.\d{1,3}){3}\s+\d+"
             )
 
             def _stream_output(proc: subprocess.Popen):
@@ -432,43 +439,65 @@ class CfstService:
                 for raw_line in proc.stdout:
                     line = raw_line.decode("utf-8", errors="replace").rstrip()
                     if line and not _skip_pattern.search(line):
-                        logger.info(f"[cfst] {line}")
+                        logger.info("[cfst] %s", line)
 
-            import threading as _threading
-            _output_thread = _threading.Thread(target=_stream_output, args=(process,), daemon=True)
-            _output_thread.start()
+            for attempt in range(1, attempt_count + 1):
+                process = None
+                self._clear_old_result_file(result_file)
+                logger.info(
+                    "Starting CFST attempt %s/%s: %s",
+                    attempt,
+                    attempt_count,
+                    self._command_for_log(cmd),
+                )
+                process = subprocess.Popen(
+                    cmd,
+                    stdin=subprocess.DEVNULL,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=False,
+                    cwd=str(binary_path.parent),
+                )
 
-            completed_from_result_file, parsed_results = self._wait_for_completion_or_result_file(
-                process=process,
-                csv_path=result_file,
-                timeout_seconds=timeout_seconds,
-            )
+                import threading as _threading
+                output_thread = _threading.Thread(target=_stream_output, args=(process,), daemon=True)
+                output_thread.start()
 
-            if completed_from_result_file:
-                logger.info("CFST 结果文件已稳定落盘，准备结束仍停留在交互退出阶段的子进程")
-                self._terminate_process(process, reason="结果文件已稳定落盘")
+                completed_from_result_file, parsed_results = self._wait_for_completion_or_result_file(
+                    process=process,
+                    csv_path=result_file,
+                    timeout_seconds=timeout_seconds,
+                )
+
+                if completed_from_result_file:
+                    self._terminate_process(process, reason="result file is stable")
+                else:
+                    if process.poll() is None:
+                        raise subprocess.TimeoutExpired(cmd=cmd, timeout=timeout_seconds)
+                    output_thread.join(timeout=5)
+                    if process.returncode != 0:
+                        raise RuntimeError(f"CFST exited with code {process.returncode}")
+                    parsed_results = self.parse_result_csv(result_file)
+
+                if parsed_results:
+                    with self._lock:
+                        self._results = parsed_results
+                        self._status_message = f"测速完成，共 {len(parsed_results)} 条结果"
+                    logger.info("CFST completed with %s result(s)", len(parsed_results))
+                    return
+
+                if attempt < attempt_count:
+                    logger.warning(
+                        "CFST returned no result meeting the minimum speed; retrying (%s/%s)",
+                        attempt,
+                        attempt_count,
+                    )
+                    continue
+
                 with self._lock:
-                    self._results = parsed_results
-                    self._status_message = f"测速完成，共 {len(parsed_results)} 条结果"
-                logger.info(f"CFST 执行完成（按结果文件接管），共解析到 {len(parsed_results)} 条结果")
-                return
-
-            if process.poll() is None:
-                raise subprocess.TimeoutExpired(cmd=cmd, timeout=timeout_seconds)
-
-            # stdout 已由 _stream_output 线程消耗完毕，等待线程结束即可
-            _output_thread.join(timeout=5)
-
-            if process.returncode != 0:
-                raise RuntimeError(f"CFST 退出码为 {process.returncode}")
-
-            parsed_results = self.parse_result_csv(result_file)
-
-            with self._lock:
-                self._results = parsed_results
-                self._status_message = f"测速完成，共 {len(parsed_results)} 条结果"
-
-            logger.info(f"CFST 执行完成，共解析到 {len(parsed_results)} 条结果")
+                    self._results = []
+                    self._status_message = "测速完成，未找到达到最低速度要求的 IP"
+                logger.warning("CFST completed without a result meeting the minimum speed")
 
         except subprocess.TimeoutExpired:
             logger.error("CFST 执行超时")
@@ -497,6 +526,7 @@ class CfstService:
             with self._lock:
                 self._running = False
                 self._progress = 100
+                self._completed_at = datetime.now()
 
     def _load_existing_results_after_timeout(self) -> bool:
         """超时时如果结果文件已经落盘，则优先接管已有结果。"""
@@ -539,6 +569,21 @@ class CfstService:
 
         return self.parse_result_csv(self.csv_results_file)
 
+    def get_last_updated(self) -> Optional[datetime]:
+        """Return the completion time of the current results, not the read time."""
+        with self._lock:
+            completed_at = self._completed_at
+        if completed_at:
+            return completed_at
+
+        result_file = self.csv_results_file
+        try:
+            if result_file.exists():
+                return datetime.fromtimestamp(result_file.stat().st_mtime)
+        except OSError:
+            logger.debug("无法读取 CFST 结果文件修改时间", exc_info=True)
+        return None
+
 
     def get_best_result(self) -> Optional[dict]:
         results = self.get_results()
@@ -573,6 +618,7 @@ class CfstService:
                 "task_id": self._task_id,
                 "progress": self._progress,
                 "started_at": self._started_at,
+                "completed_at": self._completed_at,
                 "result_count": result_count,
                 "message": self._status_message,
             }
