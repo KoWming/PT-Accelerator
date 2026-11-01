@@ -119,6 +119,7 @@ export interface CfstStatusState {
   result_count: number;
   message: string;
   started_at: string | null;
+  completed_at: string | null;
 }
 
 export interface CfstResultItem {

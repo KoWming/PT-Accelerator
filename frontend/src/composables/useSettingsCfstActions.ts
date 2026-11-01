@@ -147,6 +147,7 @@ export const useSettingsCfstActions = ({
         result_count: 0,
         message: data.message || 'Cloudflare IP 优选任务已启动',
         started_at: new Date().toISOString(),
+        completed_at: null,
       };
 
       toast.success(data.message || 'Cloudflare IP 优选任务已启动');

@@ -153,6 +153,7 @@ const cfstStatus = ref<CfstStatusState>({
   result_count: 0,
   message: '空闲',
   started_at: null,
+  completed_at: null,
 });
 const cfstResults = ref<CfstResultItem[]>([]);
 const cfstBestIp = ref('');
@@ -193,7 +194,7 @@ const fetchCfstResults = async (silent = false) => {
     cfstResults.value = Array.isArray(data.results) ? data.results.map(normalizeCfstResult) : [];
     cfstBestIp.value = data.best_ip || '';
     cfstResultFile.value = data.result_file ? './' + data.result_file.split(/[\\/]/).slice(-2).join('/') : '';
-    cfstLastUpdated.value = new Date().toISOString();
+    cfstLastUpdated.value = data.updated_at || cfstStatus.value.completed_at || '';
   } catch (error: any) {
     if (!silent) {
       toast.error('获取测速结果失败: ' + (error.response?.data?.detail || error.message));
@@ -216,6 +217,7 @@ const fetchCfstStatus = async (silent = true) => {
       result_count: Number(data.result_count ?? 0),
       message: data.message || (data.running ? '测速中' : '空闲'),
       started_at: data.started_at || null,
+      completed_at: data.completed_at || null,
     };
 
     runningCfst.value = Boolean(cfstStatus.value.running);

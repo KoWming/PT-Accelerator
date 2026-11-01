@@ -26,14 +26,14 @@ export const useCfstStore = defineStore('cfst', () => {
   const setStatus = (nextStatus: CfstStatus | null) => {
     status.value = nextStatus;
     running.value = Boolean(nextStatus?.running);
-    lastUpdated.value = new Date().toISOString();
+    lastUpdated.value = nextStatus?.completed_at || lastUpdated.value;
   };
 
   const applyResults = (data?: CfstResultsOut | null) => {
     results.value = Array.isArray(data?.results) ? data.results : [];
     bestIp.value = data?.best_ip || null;
     resultFile.value = data?.result_file || null;
-    lastUpdated.value = new Date().toISOString();
+    lastUpdated.value = data?.updated_at || status.value?.completed_at || lastUpdated.value;
   };
 
   const setError = (message: string | null) => {

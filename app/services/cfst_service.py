@@ -42,6 +42,7 @@ class CfstService:
         self._results: list[dict] = []
         self._task_id: Optional[str] = None
         self._started_at: Optional[datetime] = None
+        self._completed_at: Optional[datetime] = None
         self._progress = 0
         self._status_message = "空闲"
         self._lock = threading.Lock()
@@ -57,6 +58,10 @@ class CfstService:
     @property
     def started_at(self) -> Optional[datetime]:
         return self._started_at
+
+    @property
+    def completed_at(self) -> Optional[datetime]:
+        return self._completed_at
 
     @property
     def csv_results_file(self) -> Path:
@@ -381,6 +386,7 @@ class CfstService:
             self._running = True
             self._task_id = task_id
             self._started_at = datetime.now()
+            self._completed_at = None
             self._progress = 0
             self._status_message = "测速进行中"
             self._results = []
@@ -520,6 +526,7 @@ class CfstService:
             with self._lock:
                 self._running = False
                 self._progress = 100
+                self._completed_at = datetime.now()
 
     def _load_existing_results_after_timeout(self) -> bool:
         """超时时如果结果文件已经落盘，则优先接管已有结果。"""
@@ -562,6 +569,21 @@ class CfstService:
 
         return self.parse_result_csv(self.csv_results_file)
 
+    def get_last_updated(self) -> Optional[datetime]:
+        """Return the completion time of the current results, not the read time."""
+        with self._lock:
+            completed_at = self._completed_at
+        if completed_at:
+            return completed_at
+
+        result_file = self.csv_results_file
+        try:
+            if result_file.exists():
+                return datetime.fromtimestamp(result_file.stat().st_mtime)
+        except OSError:
+            logger.debug("无法读取 CFST 结果文件修改时间", exc_info=True)
+        return None
+
 
     def get_best_result(self) -> Optional[dict]:
         results = self.get_results()
@@ -596,6 +618,7 @@ class CfstService:
                 "task_id": self._task_id,
                 "progress": self._progress,
                 "started_at": self._started_at,
+                "completed_at": self._completed_at,
                 "result_count": result_count,
                 "message": self._status_message,
             }

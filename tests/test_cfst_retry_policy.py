@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from app.services.cfst_service import CfstService
 from app.pipelines.hosts_pipeline import HostsPipeline
 
@@ -23,3 +25,11 @@ def test_hosts_source_warnings_do_not_mark_pipeline_failed():
 def test_hosts_critical_errors_still_mark_pipeline_failed():
     result = {"success": True, "errors": ["iKuai sync failed"], "warnings": []}
     assert HostsPipeline._notification_success(result) is False
+
+
+def test_last_updated_uses_completion_time_instead_of_read_time():
+    service = CfstService()
+    completed_at = datetime(2026, 10, 31, 23, 45, 12)
+    service._completed_at = completed_at
+
+    assert service.get_last_updated() == completed_at

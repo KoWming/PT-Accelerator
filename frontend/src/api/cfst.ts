@@ -35,6 +35,7 @@ export interface CfstStatus {
     result_count: number;
     message: string;
     started_at?: string | null;
+    completed_at?: string | null;
 }
 
 export interface CfstResult {
@@ -59,6 +60,7 @@ export interface CfstResultsOut {
     total: number;
     best_ip: string | null;
     result_file?: string | null;
+    updated_at?: string | null;
 }
 
 export const cfst = {

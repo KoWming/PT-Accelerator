@@ -182,6 +182,7 @@ class CfstResultsOut(BaseModel):
     total: int = 0
     best_ip: Optional[str] = None
     result_file: Optional[str] = None
+    updated_at: Optional[datetime] = None
 
 
 class CfstStatusOut(BaseModel):
@@ -190,6 +191,7 @@ class CfstStatusOut(BaseModel):
     progress: int = Field(ge=0, le=100)
     message: str = ""
     started_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
     task_id: Optional[str] = None
     result_count: int = 0
 
