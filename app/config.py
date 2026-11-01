@@ -278,6 +278,7 @@ DEFAULT_CONFIG: dict = {
         "download_count": 20,
         "download_time": 10,
         "timeout_seconds": 300,
+        "empty_result_retries": 3,
         "tcp_port": 443,
         "url": "",
         "httping": False,

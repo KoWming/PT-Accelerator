@@ -39,6 +39,7 @@ export interface CfstFormState {
   download_count: number | null;
   download_time: number | null;
   timeout_seconds: number | null;
+  empty_result_retries: number | null;
   tcp_port: number | null;
   url: string;
   httping: boolean;

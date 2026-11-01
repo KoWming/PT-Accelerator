@@ -140,6 +140,7 @@ async def update_cfst_config(
     config.set("cfst.download_count", req.download_count)
     config.set("cfst.download_time", req.download_time)
     config.set("cfst.timeout_seconds", req.timeout_seconds)
+    config.set("cfst.empty_result_retries", req.empty_result_retries)
 
 
     config.set("cfst.tcp_port", req.tcp_port)

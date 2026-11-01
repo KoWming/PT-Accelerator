@@ -9,6 +9,8 @@ export interface CfstConfig {
     ping_times: number;
     download_count: number;
     download_time: number;
+    timeout_seconds: number;
+    empty_result_retries: number;
     tcp_port: number;
     url: string;
     httping: boolean;

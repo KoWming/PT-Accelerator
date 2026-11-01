@@ -73,6 +73,7 @@ interface UseSettingsActionsOptions {
     download_count: number;
     download_time: number;
     timeout_seconds: number;
+    empty_result_retries: number;
     tcp_port: number;
     url: string;
     min_delay: number;

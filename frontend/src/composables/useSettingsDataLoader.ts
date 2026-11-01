@@ -50,6 +50,7 @@ interface UseSettingsDataLoaderOptions {
     download_count: number;
     download_time: number;
     timeout_seconds: number;
+    empty_result_retries: number;
     tcp_port: number;
     url: string;
     min_delay: number;
@@ -290,6 +291,7 @@ export const useSettingsDataLoader = ({
     cfstForm.download_count = getCfstNumberValue(cfstData.download_count, cfstDefaults.download_count);
     cfstForm.download_time = toCfstDisplayValue(cfstData.download_time, cfstDefaults.download_time);
     cfstForm.timeout_seconds = toCfstDisplayValue(getCfstTimeoutValue(cfstData), cfstDefaults.timeout_seconds);
+    cfstForm.empty_result_retries = toCfstDisplayValue(cfstData.empty_result_retries, cfstDefaults.empty_result_retries);
     cfstForm.tcp_port = toCfstDisplayValue(cfstData.tcp_port, cfstDefaults.tcp_port);
     cfstForm.url = toCfstDisplayText(cfstData.url, cfstDefaults.url);
     cfstForm.httping = Boolean(cfstData.httping);
